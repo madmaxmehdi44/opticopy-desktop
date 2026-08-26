@@ -26,6 +26,7 @@
                     <Color x:Key="OptiCardBorder">#334155</Color>
                     <Color x:Key="OptiCardBorderHighlight">#0284C7</Color>
                     <SolidColorBrush x:Key="OptiBackgroundBrush" Color="{StaticResource OptiObsidianDark}" />
+                    <SolidColorBrush x:Key="OptiObsidianBrush" Color="{StaticResource OptiObsidianDark}" />
                     <SolidColorBrush x:Key="OptiSurfaceBrush" Color="{StaticResource OptiSurfaceDark}" />
                     <SolidColorBrush x:Key="OptiSurfaceVariantBrush" Color="{StaticResource OptiSurfaceVariantDark}" />
                     <SolidColorBrush x:Key="OptiSurfaceElevatedBrush" Color="{StaticResource OptiSurfaceElevated}" />
@@ -35,6 +36,7 @@
                     <SolidColorBrush x:Key="OptiAmberBrush" Color="{StaticResource OptiNeonAmber}" />
                     <SolidColorBrush x:Key="OptiTextPrimaryBrush" Color="{StaticResource OptiTextPrimary}" />
                     <SolidColorBrush x:Key="OptiTextSecondaryBrush" Color="{StaticResource OptiTextSecondary}" />
+                    <SolidColorBrush x:Key="OptiTextMutedBrush" Color="{StaticResource OptiTextMuted}" />
                     <SolidColorBrush x:Key="OptiCardBorderBrush" Color="{StaticResource OptiCardBorder}" />
                     <SolidColorBrush x:Key="OptiCardBorderHighlightBrush" Color="{StaticResource OptiCardBorderHighlight}" />
                 </ResourceDictionary>
@@ -58,6 +60,7 @@
                     <Color x:Key="OptiCardBorder">#CBD5E1</Color>
                     <Color x:Key="OptiCardBorderHighlight">#0284C7</Color>
                     <SolidColorBrush x:Key="OptiBackgroundBrush" Color="{StaticResource OptiObsidianDark}" />
+                    <SolidColorBrush x:Key="OptiObsidianBrush" Color="{StaticResource OptiObsidianDark}" />
                     <SolidColorBrush x:Key="OptiSurfaceBrush" Color="{StaticResource OptiSurfaceDark}" />
                     <SolidColorBrush x:Key="OptiSurfaceVariantBrush" Color="{StaticResource OptiSurfaceVariantDark}" />
                     <SolidColorBrush x:Key="OptiSurfaceElevatedBrush" Color="{StaticResource OptiSurfaceElevated}" />
@@ -67,6 +70,7 @@
                     <SolidColorBrush x:Key="OptiAmberBrush" Color="{StaticResource OptiNeonAmber}" />
                     <SolidColorBrush x:Key="OptiTextPrimaryBrush" Color="{StaticResource OptiTextPrimary}" />
                     <SolidColorBrush x:Key="OptiTextSecondaryBrush" Color="{StaticResource OptiTextSecondary}" />
+                    <SolidColorBrush x:Key="OptiTextMutedBrush" Color="{StaticResource OptiTextMuted}" />
                     <SolidColorBrush x:Key="OptiCardBorderBrush" Color="{StaticResource OptiCardBorder}" />
                     <SolidColorBrush x:Key="OptiCardBorderHighlightBrush" Color="{StaticResource OptiCardBorderHighlight}" />
                 </ResourceDictionary>
