@@ -6,32 +6,89 @@
     xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
     mc:Ignorable="d"
     Title="OptiCopy Desktop">
-    <Grid Padding="24">
+    <Grid Background="{ThemeResource OptiBackgroundBrush}">
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto" />
             <RowDefinition Height="*" />
         </Grid.RowDefinitions>
-        <StackPanel Spacing="4">
-            <TextBlock Text="OptiCopy" FontSize="32" FontWeight="SemiBold" />
-            <TextBlock Text="Optical file transfer" Opacity="0.7" />
-        </StackPanel>
-        <Grid Grid.Row="1" Margin="0,24,0,0">
-            <Grid.ColumnDefinitions>
-                <ColumnDefinition Width="*" />
-                <ColumnDefinition Width="*" />
-            </Grid.ColumnDefinitions>
-            <Button Grid.Column="0" Margin="0,0,8,0" MinHeight="160" HorizontalAlignment="Stretch">
-                <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center" Spacing="8">
-                    <TextBlock Text="Send" FontSize="24" HorizontalAlignment="Center" />
-                    <TextBlock Text="Display a QR stream" Opacity="0.7" HorizontalAlignment="Center" />
+
+        <Border
+            Margin="28,26,28,0"
+            Padding="4"
+            Background="{ThemeResource OptiSurfaceBrush}"
+            BorderBrush="{ThemeResource OptiCardBorderBrush}"
+            BorderThickness="1"
+            CornerRadius="18">
+            <Grid Padding="18,14">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
+                <StackPanel Spacing="2">
+                    <StackPanel Orientation="Horizontal" Spacing="10">
+                        <Ellipse Width="10" Height="10" Fill="{ThemeResource OptiCyanBrush}" VerticalAlignment="Center" />
+                        <TextBlock Text="OPTICOPY" FontSize="22" FontWeight="SemiBold" Foreground="{ThemeResource OptiTextPrimaryBrush}" />
+                    </StackPanel>
+                    <TextBlock Text="OPTICAL • AIR-GAPPED TRANSFER" FontSize="11" CharacterSpacing="180" Foreground="{ThemeResource OptiTextSecondaryBrush}" />
                 </StackPanel>
-            </Button>
-            <Button Grid.Column="1" Margin="8,0,0,0" MinHeight="160" HorizontalAlignment="Stretch">
-                <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center" Spacing="8">
-                    <TextBlock Text="Receive" FontSize="24" HorizontalAlignment="Center" />
-                    <TextBlock Text="Scan a QR stream" Opacity="0.7" HorizontalAlignment="Center" />
+                <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
+                    <Border Padding="10,6" CornerRadius="999" Background="{ThemeResource OptiSurfaceVariantBrush}" BorderBrush="{ThemeResource OptiCardBorderBrush}" BorderThickness="1">
+                        <TextBlock Text="READY" FontSize="11" FontWeight="SemiBold" Foreground="{ThemeResource OptiEmeraldBrush}" />
+                    </Border>
                 </StackPanel>
-            </Button>
-        </Grid>
+            </Grid>
+        </Border>
+
+        <ScrollViewer Grid.Row="1" Margin="28,22,28,28">
+            <StackPanel Spacing="18">
+                <StackPanel Spacing="6">
+                    <TextBlock Text="Transfer files through light." FontSize="34" FontWeight="SemiBold" Foreground="{ThemeResource OptiTextPrimaryBrush}" />
+                    <TextBlock Text="A native Windows companion to the OptiCopy mobile experience." FontSize="15" Foreground="{ThemeResource OptiTextSecondaryBrush}" />
+                </StackPanel>
+
+                <Grid ColumnSpacing="14">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="*" />
+                    </Grid.ColumnDefinitions>
+
+                    <Border Background="{ThemeResource OptiSurfaceBrush}" BorderBrush="{ThemeResource OptiCardBorderHighlightBrush}" BorderThickness="1" CornerRadius="18" Padding="24">
+                        <StackPanel Spacing="14">
+                            <Border Width="54" Height="54" CornerRadius="16" Background="{ThemeResource OptiSurfaceVariantBrush}" HorizontalAlignment="Left">
+                                <FontIcon Glyph="&#xE724;" FontSize="24" Foreground="{ThemeResource OptiCyanBrush}" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                            </Border>
+                            <TextBlock Text="Send" FontSize="25" FontWeight="SemiBold" Foreground="{ThemeResource OptiTextPrimaryBrush}" />
+                            <TextBlock Text="Turn a file into a reliable QR stream and display it full-screen." TextWrapping="Wrap" Foreground="{ThemeResource OptiTextSecondaryBrush}" />
+                            <Button Content="Start sending" HorizontalAlignment="Left" MinWidth="150" Background="{ThemeResource OptiCyanBrush}" Foreground="{ThemeResource OptiObsidianBrush}" />
+                        </StackPanel>
+                    </Border>
+
+                    <Border Grid.Column="1" Background="{ThemeResource OptiSurfaceBrush}" BorderBrush="{ThemeResource OptiCardBorderBrush}" BorderThickness="1" CornerRadius="18" Padding="24">
+                        <StackPanel Spacing="14">
+                            <Border Width="54" Height="54" CornerRadius="16" Background="{ThemeResource OptiSurfaceVariantBrush}" HorizontalAlignment="Left">
+                                <FontIcon Glyph="&#xE721;" FontSize="24" Foreground="{ThemeResource OptiEmeraldBrush}" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                            </Border>
+                            <TextBlock Text="Receive" FontSize="25" FontWeight="SemiBold" Foreground="{ThemeResource OptiTextPrimaryBrush}" />
+                            <TextBlock Text="Use your camera to capture the stream and reconstruct the file." TextWrapping="Wrap" Foreground="{ThemeResource OptiTextSecondaryBrush}" />
+                            <Button Content="Start receiving" HorizontalAlignment="Left" MinWidth="150" Background="{ThemeResource OptiEmeraldBrush}" Foreground="{ThemeResource OptiObsidianBrush}" />
+                        </StackPanel>
+                    </Border>
+                </Grid>
+
+                <Border Background="{ThemeResource OptiSurfaceBrush}" BorderBrush="{ThemeResource OptiCardBorderBrush}" BorderThickness="1" CornerRadius="18" Padding="22">
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        <StackPanel Spacing="5">
+                            <TextBlock Text="OPTICAL ENGINE" FontSize="11" CharacterSpacing="160" Foreground="{ThemeResource OptiTextMutedBrush}" />
+                            <TextBlock Text="Decimen v3 • systematic carousel • loss tolerant" FontSize="16" Foreground="{ThemeResource OptiTextPrimaryBrush}" />
+                        </StackPanel>
+                        <TextBlock Grid.Column="1" Text="AIR GAP" VerticalAlignment="Center" FontSize="11" FontWeight="SemiBold" Foreground="{ThemeResource OptiCyanBrush}" />
+                    </Grid>
+                </Border>
+            </StackPanel>
+        </ScrollViewer>
     </Grid>
 </Window>
