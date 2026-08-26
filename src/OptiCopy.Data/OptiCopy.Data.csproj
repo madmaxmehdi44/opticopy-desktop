@@ -1,0 +1,9 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <AssemblyName>OptiCopy.Data</AssemblyName>
+    <RootNamespace>OptiCopy.Data</RootNamespace>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\OptiCopy.Core\OptiCopy.Core.csproj" />
+  </ItemGroup>
+</Project>

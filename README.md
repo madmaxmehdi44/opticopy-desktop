@@ -1,19 +1,39 @@
 # OptiCopy Desktop
 
-Native Windows desktop implementation of OptiCopy using C#/.NET and WinUI 3.
+Native Windows desktop client for OptiCopy.
 
-## Architecture
+## Stack
 
-- `src/OptiCopy.Core` — platform-independent optical transfer protocol and fountain codec
-- `src/OptiCopy.Imaging` — QR encoding/decoding and camera integration
-- `src/OptiCopy.Data` — local persistence
-- `src/OptiCopy.Windows` — WinUI 3 desktop application
-- `tests/OptiCopy.Tests` — protocol and interoperability tests
+- C# / .NET 10
+- WinUI 3 / Windows App SDK
+- Native Windows UX with MVVM
+- Platform-independent optical transfer core
+- Decimen v3 systematic-carousel fountain coding
 
-## Reference implementation
+## Visual identity
 
-The optical transfer codec is being ported from `bashalarmistalt/decimen-optical-transfer` with the goal of preserving wire compatibility while keeping the Windows implementation native and maintainable.
+The Windows client intentionally shares the Android OptiCopy application's **Optical Cyber** visual system: obsidian/slate surfaces, neon cyan primary actions, emerald receiver/verified states, amber attention states, restrained borders, and technical high-contrast transfer screens.
 
-## Status
+See [`docs/UI_THEME.md`](docs/UI_THEME.md).
 
-Initial architecture and C# core port in progress.
+## Repository structure
+
+```text
+src/
+  OptiCopy.Core/       Protocol and fountain codec
+  OptiCopy.Data/       Local persistence abstractions
+  OptiCopy.Imaging/    QR and camera abstractions
+  OptiCopy.Windows/    WinUI 3 application
+
+tests/
+  OptiCopy.Tests/      Core and interoperability tests
+```
+
+## Current status
+
+The repository contains the native Windows foundation and the first C# port of the Decimen optical-transfer core. The next implementation stages are QR rendering/decoding, Windows camera capture, sender/receiver workflows, transfer history, settings, interoperability vectors, and MSIX packaging.
+
+The Decimen reference project is available at:
+https://github.com/bashalarmistalt/decimen-optical-transfer
+
+Its current release is licensed AGPL-3.0-or-later; review licensing before distributing derived code.

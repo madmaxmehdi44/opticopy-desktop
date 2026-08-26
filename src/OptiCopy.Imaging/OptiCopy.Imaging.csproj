@@ -1,0 +1,9 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <AssemblyName>OptiCopy.Imaging</AssemblyName>
+    <RootNamespace>OptiCopy.Imaging</RootNamespace>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\OptiCopy.Core\OptiCopy.Core.csproj" />
+  </ItemGroup>
+</Project>
