@@ -1,0 +1,6 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <AssemblyName>OptiCopy.Core</AssemblyName>
+    <RootNamespace>OptiCopy.Core</RootNamespace>
+  </PropertyGroup>
+</Project>
