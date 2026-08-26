@@ -26,7 +26,7 @@ public static class FrameComposition
 
     public static int[] Compose(int k, ushort sessionId, uint sequence)
     {
-        if (k <= 0) throw new ArgumentOutOfRangeException(nameof(k));
+        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(k);
         var position = (int)(sequence % (uint)CycleLength(k));
         if (position < k) return [position];
 
@@ -96,7 +96,9 @@ public sealed class CarouselFountainDecoder
 
     public CarouselFountainDecoder(int sourceBlocks, int blockLength, ushort sessionId, int totalLength)
     {
-        if (sourceBlocks <= 0 || blockLength <= 0 || totalLength < 0) throw new ArgumentOutOfRangeException();
+        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(sourceBlocks);
+        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(blockLength);
+        ArgumentOutOfRangeException.ThrowIfNegative(totalLength);
         SourceBlocks = sourceBlocks;
         BlockLength = blockLength;
         SessionId = sessionId;
