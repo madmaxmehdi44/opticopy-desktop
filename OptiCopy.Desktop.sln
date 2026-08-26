@@ -1,0 +1,42 @@
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio Version 17
+VisualStudioVersion = 17.0.31903.59
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "OptiCopy.Core", "src\OptiCopy.Core\OptiCopy.Core.csproj", "{7E4C6A48-6AF9-4A8D-9B5D-5C1B19F2C101}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "OptiCopy.Data", "src\OptiCopy.Data\OptiCopy.Data.csproj", "{3A3DA4AB-6F5F-47B7-8F43-2B39C4D0D102}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "OptiCopy.Imaging", "src\OptiCopy.Imaging\OptiCopy.Imaging.csproj", "{5D45AFA2-6A2D-4CE8-9E4A-7D5A4A1A8103}"
+EndProject
+Project("{BC8A1FFA-BEE3-4634-8014-F334798102B3}") = "OptiCopy.Windows", "src\OptiCopy.Windows\OptiCopy.Windows.csproj", "{E9D2B6B1-A8DE-461A-B0FD-A0D5A63D5104}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "OptiCopy.Tests", "tests\OptiCopy.Tests\OptiCopy.Tests.csproj", "{B9FD6A0E-5B2C-4D2B-9C5B-E3EEA6E7F105}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|x64 = Debug|x64
+		Release|x64 = Release|x64
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{7E4C6A48-6AF9-4A8D-9B5D-5C1B19F2C101}.Debug|x64.ActiveCfg = Debug|Any CPU
+		{7E4C6A48-6AF9-4A8D-9B5D-5C1B19F2C101}.Debug|x64.Build.0 = Debug|Any CPU
+		{7E4C6A48-6AF9-4A8D-9B5D-5C1B19F2C101}.Release|x64.ActiveCfg = Release|Any CPU
+		{7E4C6A48-6AF9-4A8D-9B5D-5C1B19F2C101}.Release|x64.Build.0 = Release|Any CPU
+		{3A3DA4AB-6F5F-47B7-8F43-2B39C4D0D102}.Debug|x64.ActiveCfg = Debug|Any CPU
+		{3A3DA4AB-6F5F-47B7-8F43-2B39C4D0D102}.Debug|x64.Build.0 = Debug|Any CPU
+		{3A3DA4AB-6F5F-47B7-8F43-2B39C4D0D102}.Release|x64.ActiveCfg = Release|Any CPU
+		{3A3DA4AB-6F5F-47B7-8F43-2B39C4D0D102}.Release|x64.Build.0 = Release|Any CPU
+		{5D45AFA2-6A2D-4CE8-9E4A-7D5A4A1A8103}.Debug|x64.ActiveCfg = Debug|Any CPU
+		{5D45AFA2-6A2D-4CE8-9E4A-7D5A4A1A8103}.Debug|x64.Build.0 = Debug|Any CPU
+		{5D45AFA2-6A2D-4CE8-9E4A-7D5A4A1A8103}.Release|x64.ActiveCfg = Release|Any CPU
+		{5D45AFA2-6A2D-4CE8-9E4A-7D5A4A1A8103}.Release|x64.Build.0 = Release|Any CPU
+		{E9D2B6B1-A8DE-461A-B0FD-A0D5A63D5104}.Debug|x64.ActiveCfg = Debug|x64
+		{E9D2B6B1-A8DE-461A-B0FD-A0D5A63D5104}.Debug|x64.Build.0 = Debug|x64
+		{E9D2B6B1-A8DE-461A-B0FD-A0D5A63D5104}.Release|x64.ActiveCfg = Release|x64
+		{E9D2B6B1-A8DE-461A-B0FD-A0D5A63D5104}.Release|x64.Build.0 = Release|x64
+		{B9FD6A0E-5B2C-4D2B-9C5B-E3EEA6E7F105}.Debug|x64.ActiveCfg = Debug|Any CPU
+		{B9FD6A0E-5B2C-4D2B-9C5B-E3EEA6E7F105}.Debug|x64.Build.0 = Debug|Any CPU
+		{B9FD6A0E-5B2C-4D2B-9C5B-E3EEA6E7F105}.Release|x64.ActiveCfg = Release|Any CPU
+		{B9FD6A0E-5B2C-4D2B-9C5B-E3EEA6E7F105}.Release|x64.Build.0 = Release|Any CPU
+	EndGlobalSection
+EndGlobal
