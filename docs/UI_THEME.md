@@ -1,48 +1,47 @@
 # OptiCopy Desktop UI Theme
 
-The Windows client deliberately shares the visual language of the Android OptiCopy application.
+The Windows client shares the visual identity of the Android OptiCopy application and translates it into native WinUI 3.
 
-Reference: `madmaxmehdi44/OptiCopy` theme files `Color.kt` and `Theme.kt`.
+The Android source of truth is `app/src/main/java/com/example/ui/theme/Color.kt` and `Theme.kt` in `madmaxmehdi44/OptiCopy`. The mobile palette uses Obsidian/Slate surfaces, Neon Cyan as primary, Neon Emerald as secondary, Neon Amber as tertiary, and high-contrast slate typography. 
 
 ## Palette
 
-Dark mode is based on the mobile Optical Cyber theme:
+Dark mode:
+- Obsidian `#0A0E17`
+- Slate `#0F172A`
+- Surface `#161E2E`
+- Surface Variant `#1E293B`
+- Elevated Surface `#243048`
+- Neon Cyan `#00F0FF`
+- Cyan Glow `#38BDF8`
+- Neon Emerald `#10B981`
+- Emerald Glow `#34D399`
+- Neon Amber `#F59E0B`
+- Electric Blue `#3B82F6`
+- Neon Purple `#A855F7`
+- Cyber Red `#EF4444`
+- Primary Text `#F8FAFC`
+- Secondary Text `#94A3B8`
+- Muted Text `#64748B`
+- Card Border `#334155`
+- Highlight Border `#0284C7`
 
-- Obsidian: `#0A0E17`
-- Slate: `#0F172A`
-- Surface: `#161E2E`
-- Surface variant: `#1E293B`
-- Elevated surface: `#243048`
-- Neon cyan: `#00F0FF`
-- Cyan glow: `#38BDF8`
-- Neon emerald: `#10B981`
-- Emerald glow: `#34D399`
-- Neon amber: `#F59E0B`
-- Electric blue: `#3B82F6`
-- Neon purple: `#A855F7`
-- Cyber red: `#EF4444`
-- Primary text: `#F8FAFC`
-- Secondary text: `#94A3B8`
-- Muted text: `#64748B`
-- Card border: `#334155`
-- Highlight border: `#0284C7`
+Light mode uses restrained, higher-contrast equivalents while preserving the same semantic colors.
 
 ## Windows adaptation
 
-The Windows client uses the same palette, but translates Material/Compose patterns into native WinUI 3 controls.
+The Windows application should feel like the same OptiCopy product family on Android, while retaining native Windows behavior:
 
-The application should feel like the same product family on Android and Windows while still behaving like a native Windows 11 application.
+- WinUI 3 controls and navigation
+- Windows 11 title bar and windowing
+- Mica/Acrylic only when useful
+- Native keyboard and focus behavior
+- Dark mode as the primary visual identity
+- Light mode supported
+- Cyan = optical transfer / primary action
+- Emerald = receiving / healthy / verified
+- Amber = active / attention
+- Red = error
+- Purple = diagnostics / technical tools
 
-## Design rules
-
-- Dark mode is the primary visual identity.
-- Light mode remains supported and uses restrained, higher-contrast equivalents.
-- Cyan represents the optical transfer / primary action.
-- Emerald represents receiving / healthy / verified state.
-- Amber represents active or attention-required state.
-- Red represents errors.
-- Purple is reserved for secondary technical tools and diagnostics.
-- Avoid generic Material cards, gradients, and excessive decoration.
-- Prefer restrained borders, compact typography, generous spacing, and high information density on transfer screens.
-- QR presentation should remain the visual center of the sender experience.
-- Camera/reticle UI should preserve the technical optical aesthetic of the mobile client.
+The main transfer UI should remain information-dense but calm. QR display and camera reticle experiences should visually connect to the existing mobile `QrDisplayCard`, `OpticalReticleOverlay`, `SenderScreen`, and `ReceiverScreen` concepts while being redesigned for desktop dimensions.
