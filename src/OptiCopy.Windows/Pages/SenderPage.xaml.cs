@@ -4,7 +4,7 @@ using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Media.Imaging;
 using OptiCopy.Core.Transfer;
 using OptiCopy.Imaging.Qr;
-using Windows.Storage.Pickers;
+using global::Windows.Storage.Pickers;
 using WinRT.Interop;
 
 namespace OptiCopy.Windows.Pages;
@@ -36,7 +36,7 @@ public sealed partial class SenderPage : Page
 
         try
         {
-            var buffer = await Windows.Storage.FileIO.ReadBufferAsync(file);
+            var buffer = await global::Windows.Storage.FileIO.ReadBufferAsync(file);
             var payload = buffer.ToArray();
             _session = OpticalTransferSession.Create(payload, file.Name, "application/octet-stream", CreateSessionId());
             _framesTarget = Math.Max(_session.MinimumFrames, 1u);
