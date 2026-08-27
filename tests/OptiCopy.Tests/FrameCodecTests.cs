@@ -1,4 +1,5 @@
 using OptiCopy.Core.Protocol;
+using Xunit;
 
 namespace OptiCopy.Tests;
 
