@@ -9,9 +9,9 @@ public static class SplitMix32
         {
             state = unchecked(state + 0x9E3779B9u);
             var z = state;
-            z = unchecked((z ^ (z >> 16)) * 0x85EBCA6Bu);
-            z = unchecked((z ^ (z >> 13)) * 0xC2B2AE35u);
-            z ^= z >> 16;
+            z = unchecked((z ^ (z >> 16)) * 0x21F0AAADu);
+            z = unchecked((z ^ (z >> 15)) * 0x735A2D97u);
+            z ^= z >> 15;
             return z;
         };
     }
