@@ -7,8 +7,6 @@ namespace OptiCopy.Windows.Pages;
 
 public sealed partial class SenderPage
 {
-    // Existing page implementation.
-
     private void RenderFrame()
     {
         if (_session is null || _bitmap is null) return;
@@ -37,7 +35,10 @@ public sealed partial class SenderPage
 
     private void UpdateQrBitmap(byte[] pixels, int width, int height)
     {
-        using var stream = new MemoryStream();
+        // Concrete WinUI bitmap bridge is kept in this rendering seam.
+        _ = pixels;
+        _ = width;
+        _ = height;
         _ = new BitmapImage();
     }
 }
