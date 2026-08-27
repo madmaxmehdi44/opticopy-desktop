@@ -24,11 +24,7 @@ public sealed class OpticalTransferSession
     private readonly CarouselFountainEncoder _encoder;
     private readonly uint _frameCountHint;
 
-    private OpticalTransferSession(
-        byte[] payload,
-        OpticalTransferMetadata metadata,
-        CarouselFountainEncoder encoder,
-        uint frameCountHint)
+    private OpticalTransferSession(byte[] payload, OpticalTransferMetadata metadata, CarouselFountainEncoder encoder, uint frameCountHint)
     {
         Payload = payload;
         Metadata = metadata;
@@ -41,20 +37,14 @@ public sealed class OpticalTransferSession
     public uint Sequence { get; private set; }
     public uint FramesEmitted { get; private set; }
 
-    public static OpticalTransferSession Create(
-        byte[] payload,
-        string fileName,
-        string mimeType,
-        ushort sessionId,
-        ushort blockLength = 768,
-        uint repairFramesPerBlock = 3)
+    public static OpticalTransferSession Create(byte[] payload, string fileName, string mimeType, ushort sessionId, ushort blockLength = 768, uint repairFramesPerBlock = 3)
     {
         ArgumentNullException.ThrowIfNull(payload);
         ArgumentException.ThrowIfNullOrWhiteSpace(fileName);
         ArgumentException.ThrowIfNullOrWhiteSpace(mimeType);
         ArgumentOutOfRangeException.ThrowIfZero(sessionId);
         ArgumentOutOfRangeException.ThrowIfZero(blockLength);
-        if (repairFramesPerBlock == 0) throw new ArgumentOutOfRangeException(nameof(repairFramesPerBlock));
+        ArgumentOutOfRangeException.ThrowIfZero(repairFramesPerBlock);
         if (payload.LongLength > uint.MaxValue)
             throw new NotSupportedException("The current wire format supports payloads up to 4 GiB.");
 
