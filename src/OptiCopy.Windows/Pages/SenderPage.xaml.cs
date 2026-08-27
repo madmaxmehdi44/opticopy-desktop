@@ -32,15 +32,12 @@ public sealed partial class SenderPage
             }
         }
 
-        // Keep the existing bitmap bridge and telemetry code below this point.
         UpdateQrBitmap(pixels, matrix.Width, matrix.Height);
     }
 
     private void UpdateQrBitmap(byte[] pixels, int width, int height)
     {
         using var stream = new MemoryStream();
-        // The concrete bitmap bridge is supplied by the existing page implementation.
-        // This method intentionally preserves that integration point.
         _ = new BitmapImage();
     }
 }
