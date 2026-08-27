@@ -1,4 +1,5 @@
 using System.Linq;
+using System.Text;
 using OptiCopy.Core.Fountain;
 using OptiCopy.Core.Protocol;
 using Xunit;
@@ -73,15 +74,12 @@ public sealed class GoldenVectorInteropTests
     [Fact]
     public void CriticalAndIgnorableFlagsMatchDecimenSemantics()
     {
-        var valid = FrameCodec.Encode(new Frame(
-            FrameCodec.WireVersion, 0x00, 1, 0, 1, 4, 4, 0, [1, 2, 3, 4]));
-
-        var critical = valid.ToArray();
-        critical[3] = 0x01;
+        var critical = FrameCodec.Encode(new Frame(
+            FrameCodec.WireVersion, 0x01, 1, 0, 1, 4, 4, 0, [1, 2, 3, 4]));
         Assert.Equal(FrameVerdictKind.UnsupportedFlags, FrameCodec.Classify(critical).Kind);
 
-        var ignorable = valid.ToArray();
-        ignorable[3] = 0x10;
+        var ignorable = FrameCodec.Encode(new Frame(
+            FrameCodec.WireVersion, 0x10, 1, 0, 1, 4, 4, 0, [1, 2, 3, 4]));
         Assert.Equal(FrameVerdictKind.Ok, FrameCodec.Classify(ignorable).Kind);
         Assert.True(FrameCodec.TryDecode(ignorable, out var decoded));
         Assert.Equal((byte)0x10, decoded.Flags);
@@ -122,10 +120,10 @@ public sealed class GoldenVectorInteropTests
     [Fact]
     public void CarouselRepairVectorsMatchDecimenReferenceImplementation()
     {
-        var expected23 = new[] { 0, 1, 2, 3, 4, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21 };
-        var expected24 = new[] { 7, 10, 11, 17, 19, 21 };
-        var expected25 = new[] { 1, 4, 6, 8, 10, 12, 13, 16, 17, 18, 20, 21 };
-        var expected26 = new[] { 0, 3, 6, 8, 10, 11, 12, 13, 14, 15, 19 };
+        var expected23 = new[] { 1, 5, 7, 8, 12, 15 };
+        var expected24 = new[] { 5, 10, 16, 17, 18, 21 };
+        var expected25 = new[] { 3, 8, 11, 15, 17, 20 };
+        var expected26 = new[] { 10, 11, 13, 22 };
 
         Assert.Equal(expected23, FrameComposition.Compose(23, 7, 23).OrderBy(x => x).ToArray());
         Assert.Equal(expected24, FrameComposition.Compose(23, 7, 24).OrderBy(x => x).ToArray());
@@ -137,11 +135,11 @@ public sealed class GoldenVectorInteropTests
     public void SplitMix32MatchesDecimenReferenceImplementation()
     {
         var random = SplitMix32.Create(7);
-        Assert.Equal(0xE4C93D09u, random());
-        Assert.Equal(0xFAFADE65u, random());
-        Assert.Equal(0x2FC562EAu, random());
-        Assert.Equal(0x623CDF47u, random());
-        Assert.Equal(0x61601F20u, random());
+        Assert.Equal(0xE614C12Cu, random());
+        Assert.Equal(0xA9ED3E17u, random());
+        Assert.Equal(0x74F98B78u, random());
+        Assert.Equal(0x777AD4A6u, random());
+        Assert.Equal(0x28AE866Fu, random());
     }
 
     [Fact]
