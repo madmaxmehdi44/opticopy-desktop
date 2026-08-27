@@ -1,4 +1,3 @@
-using System.Globalization;
 using System.Security.Cryptography;
 using OptiCopy.Core.Fountain;
 using OptiCopy.Core.Protocol;
@@ -23,26 +22,39 @@ public sealed record OpticalTransferFrame(
 
 public sealed class OpticalTransferSession
 {
-    private const string ProtocolVersion = "DOT3";
     private readonly CarouselFountainEncoder _encoder;
     private readonly uint _frameCountHint;
-    private readonly string _transferId;
+    private readonly uint _containerFnv;
 
-    private OpticalTransferSession(byte[] payload, OpticalTransferMetadata metadata, CarouselFountainEncoder encoder, uint frameCountHint, string transferId)
+    private OpticalTransferSession(
+        byte[] originalPayload,
+        byte[] container,
+        OpticalTransferMetadata metadata,
+        CarouselFountainEncoder encoder,
+        uint frameCountHint,
+        uint containerFnv)
     {
-        Payload = payload;
+        Payload = originalPayload;
+        Container = container;
         Metadata = metadata;
         _encoder = encoder;
         _frameCountHint = frameCountHint;
-        _transferId = transferId;
+        _containerFnv = containerFnv;
     }
 
     public byte[] Payload { get; }
+    public byte[] Container { get; }
     public OpticalTransferMetadata Metadata { get; }
     public uint Sequence { get; private set; }
     public uint FramesEmitted { get; private set; }
 
-    public static OpticalTransferSession Create(byte[] payload, string fileName, string mimeType, ushort sessionId, ushort blockLength = 360, uint repairFramesPerBlock = 3)
+    public static OpticalTransferSession Create(
+        byte[] payload,
+        string fileName,
+        string mimeType,
+        ushort sessionId,
+        ushort blockLength = 360,
+        uint repairFramesPerBlock = 3)
     {
         ArgumentNullException.ThrowIfNull(payload);
         ArgumentException.ThrowIfNullOrWhiteSpace(fileName);
@@ -53,11 +65,12 @@ public sealed class OpticalTransferSession
         if (payload.LongLength > uint.MaxValue)
             throw new NotSupportedException("The current wire format supports payloads up to 4 GiB.");
 
+        var container = OpticalFileContainer.Pack(fileName, mimeType, payload);
         var sha256 = Convert.ToHexString(SHA256.HashData(payload)).ToLowerInvariant();
-        var encoder = new CarouselFountainEncoder(payload, blockLength, sessionId);
+        var encoder = new CarouselFountainEncoder(container, blockLength, sessionId);
         var sourceBlocks = checked((ushort)encoder.SourceBlocks);
-        var frameCountHint = sourceBlocks;
-        var transferId = sessionId.ToString("x4", CultureInfo.InvariantCulture);
+        var frameCountHint = checked((uint)FrameComposition.CycleLength(encoder.SourceBlocks));
+        var containerFnv = Fnv1a.Hash(container);
 
         var metadata = new OpticalTransferMetadata(
             sessionId,
@@ -69,14 +82,17 @@ public sealed class OpticalTransferSession
             blockLength,
             frameCountHint);
 
-        return new OpticalTransferSession(payload, metadata, encoder, frameCountHint, transferId);
+        return new OpticalTransferSession(
+            payload,
+            container,
+            metadata,
+            encoder,
+            frameCountHint,
+            containerFnv);
     }
 
     public OpticalTransferFrame NextFrame()
     {
-        if (FramesEmitted >= Metadata.SourceBlocks)
-            throw new InvalidOperationException("The systematic DOT3 transfer cycle is complete.");
-
         var sequence = Sequence++;
         FramesEmitted++;
         var encoded = _encoder.Encode(sequence);
@@ -87,27 +103,16 @@ public sealed class OpticalTransferSession
             sequence,
             Metadata.SourceBlocks,
             Metadata.BlockLength,
-            checked((uint)Metadata.OriginalLength),
-            Fnv1a.Hash(encoded),
+            checked((uint)Container.Length),
+            _containerFnv,
             encoded);
 
-        var binaryFrameBase64 = Convert.ToBase64String(FrameCodec.Encode(frame));
-        var chunkBase64 = Convert.ToBase64String(encoded);
-        var protocolPacket = string.Join(
-            '|',
-            ProtocolVersion,
-            _transferId,
+        var wire = FrameCodec.Encode(frame);
+        return new OpticalTransferFrame(
             sequence,
-            Metadata.SourceBlocks,
-            Metadata.SourceBlocks,
-            Metadata.OriginalLength,
-            Metadata.Sha256,
-            "0",
-            SanitizeMetadata(Metadata.MimeType),
-            SanitizeMetadata(Metadata.FileName),
-            chunkBase64);
-
-        return new OpticalTransferFrame(sequence, frame, binaryFrameBase64, protocolPacket);
+            frame,
+            Convert.ToBase64String(wire),
+            string.Empty);
     }
 
     public void Reset()
