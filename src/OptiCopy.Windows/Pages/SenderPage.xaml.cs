@@ -2,7 +2,6 @@ using System.Diagnostics;
 using System.Globalization;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
-using Microsoft.UI.Xaml.Media.Imaging;
 using OptiCopy.Core.Transfer;
 using OptiCopy.Imaging.Qr;
 using global::System.Runtime.InteropServices.WindowsRuntime;
@@ -44,6 +43,7 @@ public sealed partial class SenderPage : Page
                 SuggestedStartLocation = global::Windows.Storage.Pickers.PickerLocationId.DocumentsLibrary,
                 ViewMode = global::Windows.Storage.Pickers.PickerViewMode.List
             };
+            picker.FileTypeFilter.Add("*");
 
             var hwnd = WindowNative.GetWindowHandle(App.MainWindow);
             InitializeWithWindow.Initialize(picker, hwnd);
