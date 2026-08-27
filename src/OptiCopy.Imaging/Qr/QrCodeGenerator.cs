@@ -23,6 +23,8 @@ public sealed record QrCodeOptions(
 
 public sealed class QrCodeGenerator
 {
+    private readonly QRCodeWriter _writer = new();
+
     public QrMatrix Generate(string content, QrCodeOptions? options = null)
     {
         ArgumentException.ThrowIfNullOrEmpty(content);
@@ -40,8 +42,7 @@ public sealed class QrCodeGenerator
         if (options.DisableEci)
             hints[EncodeHintType.DISABLE_ECI] = true;
 
-        var writer = new QRCodeWriter();
-        var matrix = writer.encode(content, BarcodeFormat.QR_CODE, options.Width, options.Height, hints);
+        var matrix = _writer.encode(content, BarcodeFormat.QR_CODE, options.Width, options.Height, hints);
         var modules = new bool[checked(matrix.Width * matrix.Height)];
         for (var y = 0; y < matrix.Height; y++)
         {
@@ -57,12 +58,12 @@ public sealed class QrCodeGenerator
         return Generate(Encoding.UTF8.GetString(utf8Content), options);
     }
 
-    private static ErrorCorrectionLevel ToLevel(QrErrorCorrection correction) => correction switch
+    private static ZXing.QrCode.Internal.ErrorCorrectionLevel ToLevel(QrErrorCorrection correction) => correction switch
     {
-        QrErrorCorrection.Low => ErrorCorrectionLevel.L,
-        QrErrorCorrection.Medium => ErrorCorrectionLevel.M,
-        QrErrorCorrection.Quartile => ErrorCorrectionLevel.Q,
-        QrErrorCorrection.High => ErrorCorrectionLevel.H,
+        QrErrorCorrection.Low => ZXing.QrCode.Internal.ErrorCorrectionLevel.L,
+        QrErrorCorrection.Medium => ZXing.QrCode.Internal.ErrorCorrectionLevel.M,
+        QrErrorCorrection.Quartile => ZXing.QrCode.Internal.ErrorCorrectionLevel.Q,
+        QrErrorCorrection.High => ZXing.QrCode.Internal.ErrorCorrectionLevel.H,
         _ => throw new ArgumentOutOfRangeException(nameof(correction))
     };
 }

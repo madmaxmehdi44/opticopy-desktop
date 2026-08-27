@@ -1,4 +1,5 @@
 using OptiCopy.Imaging.Qr;
+using Xunit;
 
 namespace OptiCopy.Tests;
 
