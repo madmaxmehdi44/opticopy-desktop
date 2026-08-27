@@ -17,19 +17,28 @@ public sealed record OpticalTransferMetadata(
 public sealed record OpticalTransferFrame(
     uint Sequence,
     Frame Frame,
-    string PayloadBase64);
+    string PayloadBase64,
+    string ProtocolPacket);
 
 public sealed class OpticalTransferSession
 {
+    private const string ProtocolVersion = "DOT3";
     private readonly CarouselFountainEncoder _encoder;
     private readonly uint _frameCountHint;
+    private readonly string _transferId;
 
-    private OpticalTransferSession(byte[] payload, OpticalTransferMetadata metadata, CarouselFountainEncoder encoder, uint frameCountHint)
+    private OpticalTransferSession(
+        byte[] payload,
+        OpticalTransferMetadata metadata,
+        CarouselFountainEncoder encoder,
+        uint frameCountHint,
+        string transferId)
     {
         Payload = payload;
         Metadata = metadata;
         _encoder = encoder;
         _frameCountHint = frameCountHint;
+        _transferId = transferId;
     }
 
     public byte[] Payload { get; }
@@ -37,7 +46,13 @@ public sealed class OpticalTransferSession
     public uint Sequence { get; private set; }
     public uint FramesEmitted { get; private set; }
 
-    public static OpticalTransferSession Create(byte[] payload, string fileName, string mimeType, ushort sessionId, ushort blockLength = 768, uint repairFramesPerBlock = 3)
+    public static OpticalTransferSession Create(
+        byte[] payload,
+        string fileName,
+        string mimeType,
+        ushort sessionId,
+        ushort blockLength = 360,
+        uint repairFramesPerBlock = 3)
     {
         ArgumentNullException.ThrowIfNull(payload);
         ArgumentException.ThrowIfNullOrWhiteSpace(fileName);
@@ -50,22 +65,28 @@ public sealed class OpticalTransferSession
 
         var sha256 = Convert.ToHexString(SHA256.HashData(payload)).ToLowerInvariant();
         var encoder = new CarouselFountainEncoder(payload, blockLength, sessionId);
-        var hint = checked((uint)encoder.SourceBlocks * 2u);
+        var sourceBlocks = checked((ushort)encoder.SourceBlocks);
+        var frameCountHint = sourceBlocks;
+        var transferId = sessionId.ToString("x4");
+
         var metadata = new OpticalTransferMetadata(
             sessionId,
             SanitizeMetadata(fileName),
             SanitizeMetadata(mimeType),
             payload.LongLength,
             sha256,
-            checked((ushort)encoder.SourceBlocks),
+            sourceBlocks,
             blockLength,
-            hint);
+            frameCountHint);
 
-        return new OpticalTransferSession(payload, metadata, encoder, hint);
+        return new OpticalTransferSession(payload, metadata, encoder, frameCountHint, transferId);
     }
 
     public OpticalTransferFrame NextFrame()
     {
+        if (FramesEmitted >= Metadata.SourceBlocks)
+            throw new InvalidOperationException("The systematic DOT3 transfer cycle is complete.");
+
         var sequence = Sequence++;
         FramesEmitted++;
         var encoded = _encoder.Encode(sequence);
@@ -80,7 +101,23 @@ public sealed class OpticalTransferSession
             Fnv1a.Hash(encoded),
             encoded);
 
-        return new OpticalTransferFrame(sequence, frame, Convert.ToBase64String(FrameCodec.Encode(frame)));
+        var binaryFrameBase64 = Convert.ToBase64String(FrameCodec.Encode(frame));
+        var chunkBase64 = Convert.ToBase64String(encoded);
+        var protocolPacket = string.Join(
+            '|',
+            ProtocolVersion,
+            _transferId,
+            sequence,
+            Metadata.SourceBlocks,
+            Metadata.SourceBlocks,
+            Metadata.OriginalLength,
+            Metadata.Sha256,
+            "0",
+            SanitizeMetadata(Metadata.MimeType),
+            SanitizeMetadata(Metadata.FileName),
+            chunkBase64);
+
+        return new OpticalTransferFrame(sequence, frame, binaryFrameBase64, protocolPacket);
     }
 
     public void Reset()
@@ -91,5 +128,6 @@ public sealed class OpticalTransferSession
 
     public uint MinimumFrames => _frameCountHint;
 
-    private static string SanitizeMetadata(string value) => value.Replace('|', '_').Replace('\r', '_').Replace('\n', '_');
+    private static string SanitizeMetadata(string value) =>
+        value.Replace('|', '_').Replace('\r', '_').Replace('\n', '_');
 }
