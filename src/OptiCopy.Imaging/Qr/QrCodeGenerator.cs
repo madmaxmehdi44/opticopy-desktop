@@ -2,6 +2,7 @@ using System.Text;
 using ZXing;
 using ZXing.Common;
 using ZXing.QrCode;
+using ZXing.QrCode.Internal;
 
 namespace OptiCopy.Imaging.Qr;
 
