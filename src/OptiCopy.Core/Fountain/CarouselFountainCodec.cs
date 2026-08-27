@@ -109,8 +109,8 @@ public sealed class CarouselFountainDecoder
         ArgumentOutOfRangeException.ThrowIfNegativeOrZero(sourceBlocks);
         ArgumentOutOfRangeException.ThrowIfNegativeOrZero(blockLength);
         ArgumentOutOfRangeException.ThrowIfNegative(totalLength);
-        if (sourceBlocks > ushort.MaxValue) throw new ArgumentOutOfRangeException(nameof(sourceBlocks));
-        if (totalLength > global::OptiCopy.Core.Protocol.FrameCodec.MaxFileBytes) throw new ArgumentOutOfRangeException(nameof(totalLength));
+        ArgumentOutOfRangeException.ThrowIfGreaterThan(sourceBlocks, ushort.MaxValue);
+        ArgumentOutOfRangeException.ThrowIfGreaterThan(totalLength, global::OptiCopy.Core.Protocol.FrameCodec.MaxFileBytes);
 
         SourceBlocks = sourceBlocks;
         BlockLength = blockLength;
