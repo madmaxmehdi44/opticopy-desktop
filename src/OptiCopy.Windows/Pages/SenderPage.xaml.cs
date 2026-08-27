@@ -37,7 +37,7 @@ public sealed partial class SenderPage : Page
         try
         {
             var buffer = await global::Windows.Storage.FileIO.ReadBufferAsync(file);
-            var payload = buffer.ToArray();
+            var payload = global::System.Runtime.InteropServices.WindowsRuntime.WindowsRuntimeBufferExtensions.ToArray(buffer);
             _session = OpticalTransferSession.Create(payload, file.Name, "application/octet-stream", CreateSessionId());
             _framesTarget = Math.Max(_session.MinimumFrames, 1u);
 
