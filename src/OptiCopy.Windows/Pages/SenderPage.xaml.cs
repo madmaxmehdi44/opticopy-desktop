@@ -2,10 +2,10 @@ using System.Diagnostics;
 using System.Globalization;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
+using Microsoft.UI.Xaml.Media.Imaging;
 using OptiCopy.Core.Transfer;
 using OptiCopy.Imaging.Qr;
 using global::System.Runtime.InteropServices.WindowsRuntime;
-using global::Windows.Graphics.Imaging;
 using global::Windows.Storage.Pickers;
 using WinRT.Interop;
 
@@ -97,7 +97,7 @@ public sealed partial class SenderPage : Page
         _session.Reset();
         _clock.Restart();
         _renderInProgress = false;
-        _ = RenderFrameAsync();
+        RenderFrame();
         _timer.Start();
         StartButton.IsEnabled = false;
         PauseButton.IsEnabled = true;
@@ -147,10 +147,10 @@ public sealed partial class SenderPage : Page
     private void Timer_Tick(object? sender, object e)
     {
         if (_renderInProgress) return;
-        _ = RenderFrameAsync();
+        RenderFrame();
     }
 
-    private async Task RenderFrameAsync()
+    private void RenderFrame()
     {
         if (_session is null || _renderInProgress) return;
         _renderInProgress = true;
@@ -176,7 +176,7 @@ public sealed partial class SenderPage : Page
                 }
             }
 
-            QrImage.Source = await CreateBitmapAsync(pixels, matrix.Width, matrix.Height);
+            QrImage.Source = CreateBitmap(pixels, matrix.Width, matrix.Height);
             FrameLabel.Text = $"FRAME {transferFrame.Sequence.ToString(CultureInfo.InvariantCulture)}";
             StreamLabel.Text = $"{_session.FramesEmitted.ToString("N0", CultureInfo.InvariantCulture)} frames emitted";
             var progress = Math.Min(1d, (double)_session.FramesEmitted / _framesTarget);
@@ -215,18 +215,14 @@ public sealed partial class SenderPage : Page
         }
     }
 
-    private static async Task<SoftwareBitmapSource> CreateBitmapAsync(byte[] pixels, int width, int height)
+    private static WriteableBitmap CreateBitmap(byte[] pixels, int width, int height)
     {
-        using var bitmap = new SoftwareBitmap(
-            BitmapPixelFormat.Rgba8,
-            width,
-            height,
-            BitmapAlphaMode.Premultiplied);
-        bitmap.CopyFromBuffer(pixels.AsBuffer());
-
-        var source = new SoftwareBitmapSource();
-        await source.SetBitmapAsync(bitmap);
-        return source;
+        var bitmap = new WriteableBitmap(width, height);
+        using var stream = bitmap.PixelBuffer.AsStream();
+        stream.Position = 0;
+        stream.Write(pixels, 0, pixels.Length);
+        bitmap.Invalidate();
+        return bitmap;
     }
 
     private static ushort CreateSessionId()
