@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.Security.Cryptography;
 using OptiCopy.Core.Fountain;
 using OptiCopy.Core.Protocol;
@@ -27,12 +28,7 @@ public sealed class OpticalTransferSession
     private readonly uint _frameCountHint;
     private readonly string _transferId;
 
-    private OpticalTransferSession(
-        byte[] payload,
-        OpticalTransferMetadata metadata,
-        CarouselFountainEncoder encoder,
-        uint frameCountHint,
-        string transferId)
+    private OpticalTransferSession(byte[] payload, OpticalTransferMetadata metadata, CarouselFountainEncoder encoder, uint frameCountHint, string transferId)
     {
         Payload = payload;
         Metadata = metadata;
@@ -46,13 +42,7 @@ public sealed class OpticalTransferSession
     public uint Sequence { get; private set; }
     public uint FramesEmitted { get; private set; }
 
-    public static OpticalTransferSession Create(
-        byte[] payload,
-        string fileName,
-        string mimeType,
-        ushort sessionId,
-        ushort blockLength = 360,
-        uint repairFramesPerBlock = 3)
+    public static OpticalTransferSession Create(byte[] payload, string fileName, string mimeType, ushort sessionId, ushort blockLength = 360, uint repairFramesPerBlock = 3)
     {
         ArgumentNullException.ThrowIfNull(payload);
         ArgumentException.ThrowIfNullOrWhiteSpace(fileName);
@@ -67,7 +57,7 @@ public sealed class OpticalTransferSession
         var encoder = new CarouselFountainEncoder(payload, blockLength, sessionId);
         var sourceBlocks = checked((ushort)encoder.SourceBlocks);
         var frameCountHint = sourceBlocks;
-        var transferId = sessionId.ToString("x4");
+        var transferId = sessionId.ToString("x4", CultureInfo.InvariantCulture);
 
         var metadata = new OpticalTransferMetadata(
             sessionId,
@@ -128,6 +118,5 @@ public sealed class OpticalTransferSession
 
     public uint MinimumFrames => _frameCountHint;
 
-    private static string SanitizeMetadata(string value) =>
-        value.Replace('|', '_').Replace('\r', '_').Replace('\n', '_');
+    private static string SanitizeMetadata(string value) => value.Replace('|', '_').Replace('\r', '_').Replace('\n', '_');
 }
