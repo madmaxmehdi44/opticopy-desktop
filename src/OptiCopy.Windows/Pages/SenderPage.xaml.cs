@@ -164,7 +164,6 @@ public sealed partial class SenderPage : Page
 
     private static BitmapImage CreateBitmap(byte[] pixels, int width, int height)
     {
-        // QR-to-SoftwareBitmap bridge is isolated here for the Windows rendering phase.
         _ = pixels;
         _ = width;
         _ = height;
