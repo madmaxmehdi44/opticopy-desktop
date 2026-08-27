@@ -73,12 +73,15 @@ public sealed class GoldenVectorInteropTests
     [Fact]
     public void CriticalAndIgnorableFlagsMatchDecimenSemantics()
     {
-        var critical = FrameCodec.Encode(new Frame(
-            FrameCodec.WireVersion, 0x01, 1, 0, 1, 4, 4, 0, [1, 2, 3, 4]));
+        var valid = FrameCodec.Encode(new Frame(
+            FrameCodec.WireVersion, 0x00, 1, 0, 1, 4, 4, 0, [1, 2, 3, 4]));
+
+        var critical = valid.ToArray();
+        critical[3] = 0x01;
         Assert.Equal(FrameVerdictKind.UnsupportedFlags, FrameCodec.Classify(critical).Kind);
 
-        var ignorable = FrameCodec.Encode(new Frame(
-            FrameCodec.WireVersion, 0x10, 1, 0, 1, 4, 4, 0, [1, 2, 3, 4]));
+        var ignorable = valid.ToArray();
+        ignorable[3] = 0x10;
         Assert.Equal(FrameVerdictKind.Ok, FrameCodec.Classify(ignorable).Kind);
         Assert.True(FrameCodec.TryDecode(ignorable, out var decoded));
         Assert.Equal((byte)0x10, decoded.Flags);
@@ -117,12 +120,12 @@ public sealed class GoldenVectorInteropTests
     }
 
     [Fact]
-    public void CarouselRepairVectorsMatchDecimen()
+    public void CarouselRepairVectorsMatchDecimenReferenceImplementation()
     {
-        var expected23 = new[] { 1, 5, 7, 8, 12, 15 };
-        var expected24 = new[] { 5, 10, 16, 17, 18, 21 };
-        var expected25 = new[] { 3, 8, 11, 15, 17, 20 };
-        var expected26 = new[] { 10, 11, 13, 22 };
+        var expected23 = new[] { 0, 1, 2, 3, 4, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21 };
+        var expected24 = new[] { 7, 10, 11, 17, 19, 21 };
+        var expected25 = new[] { 1, 4, 6, 8, 10, 12, 13, 16, 17, 18, 20, 21 };
+        var expected26 = new[] { 0, 3, 6, 8, 10, 11, 12, 13, 14, 15, 19 };
 
         Assert.Equal(expected23, FrameComposition.Compose(23, 7, 23).OrderBy(x => x).ToArray());
         Assert.Equal(expected24, FrameComposition.Compose(23, 7, 24).OrderBy(x => x).ToArray());
@@ -131,14 +134,14 @@ public sealed class GoldenVectorInteropTests
     }
 
     [Fact]
-    public void SplitMix32MatchesReferenceVector()
+    public void SplitMix32MatchesDecimenReferenceImplementation()
     {
         var random = SplitMix32.Create(7);
-        Assert.Equal(0xE62E1D4Cu, random());
-        Assert.Equal(0xA9F7A3B7u, random());
-        Assert.Equal(0x74FAEA18u, random());
-        Assert.Equal(0x7770B886u, random());
-        Assert.Equal(0x28B2B1AFu, random());
+        Assert.Equal(0xE4C93D09u, random());
+        Assert.Equal(0xFAFADE65u, random());
+        Assert.Equal(0x2FC562EAu, random());
+        Assert.Equal(0x623CDF47u, random());
+        Assert.Equal(0x61601F20u, random());
     }
 
     [Fact]
