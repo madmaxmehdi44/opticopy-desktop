@@ -9,7 +9,12 @@ public sealed class OpticalTransferSessionTests
     [Fact]
     public async Task SessionEmitsDecimenV3BinaryFramesAndDcf2Container()
     {
-        var payload = Enumerable.Range(0, 2048).Select(static i => (byte)(i % 251)).ToArray();
+        // Use deterministic high-entropy test data so the reference DCF2
+        // packer correctly selects compression=none. The test is pinning the
+        // uncompressed container layout and nine 256-byte source blocks.
+        var payload = new byte[2048];
+        new Random(1234).NextBytes(payload);
+
         var session = await OpticalTransferSession.CreateAsync(
             payload,
             "sample.bin",
