@@ -26,7 +26,7 @@ public static class FrameComposition
 
     public static int[] Compose(int k, ushort sessionId, uint sequence)
     {
-        if (k <= 0) throw new ArgumentOutOfRangeException(nameof(k));
+        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(k);
         var position = (int)(sequence % (uint)CycleLength(k));
         if (position < k) return [position];
 
@@ -56,7 +56,8 @@ public sealed class CarouselFountainEncoder
 
     public CarouselFountainEncoder(ReadOnlySpan<byte> payload, int blockLength, ushort sessionId)
     {
-        if (blockLength is <= 0 or > ushort.MaxValue) throw new ArgumentOutOfRangeException(nameof(blockLength));
+        if (blockLength is <= 0 or > ushort.MaxValue)
+            throw new ArgumentOutOfRangeException(nameof(blockLength), blockLength, "Block length must be between 1 and UInt16.MaxValue.");
         BlockLength = blockLength;
         SessionId = sessionId;
         TotalLength = payload.Length;
@@ -96,7 +97,9 @@ public sealed class CarouselFountainDecoder
 
     public CarouselFountainDecoder(int sourceBlocks, int blockLength, ushort sessionId, int totalLength)
     {
-        if (sourceBlocks <= 0 || blockLength <= 0 || totalLength < 0) throw new ArgumentOutOfRangeException();
+        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(sourceBlocks);
+        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(blockLength);
+        ArgumentOutOfRangeException.ThrowIfNegative(totalLength);
         SourceBlocks = sourceBlocks;
         BlockLength = blockLength;
         SessionId = sessionId;
@@ -116,7 +119,8 @@ public sealed class CarouselFountainDecoder
 
     public void AddFrame(uint sequence, ReadOnlySpan<byte> payload)
     {
-        if (payload.Length < BlockLength) throw new ArgumentException("Frame payload is shorter than block length.", nameof(payload));
+        if (payload.Length < BlockLength)
+            throw new ArgumentException("Frame payload is shorter than block length.", nameof(payload));
         if (!_seen.Add(sequence)) { DuplicateFrames++; return; }
         NewFrames++;
         if (IsComplete) return;
