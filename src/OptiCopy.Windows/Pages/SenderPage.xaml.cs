@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using System.Globalization;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Media.Imaging;
@@ -44,9 +45,9 @@ public sealed partial class SenderPage : Page
             FileNameLabel.Text = file.Name;
             FileSizeLabel.Text = FormatBytes(payload.LongLength);
             HashLabel.Text = $"SHA-256: {_session.Metadata.Sha256}";
-            BlocksLabel.Text = _session.Metadata.SourceBlocks.ToString();
-            BlockLengthLabel.Text = _session.Metadata.BlockLength.ToString();
-            CycleLabel.Text = _framesTarget.ToString();
+            BlocksLabel.Text = _session.Metadata.SourceBlocks.ToString(CultureInfo.InvariantCulture);
+            BlockLengthLabel.Text = _session.Metadata.BlockLength.ToString(CultureInfo.InvariantCulture);
+            CycleLabel.Text = _framesTarget.ToString(CultureInfo.InvariantCulture);
             FrameLabel.Text = "READY";
             StreamLabel.Text = "File loaded. Start transmission.";
             EngineStatus.Text = "READY";
@@ -140,15 +141,15 @@ public sealed partial class SenderPage : Page
         }
 
         QrImage.Source = CreateBitmap(pixels, matrix.Width, matrix.Height);
-        FrameLabel.Text = $"FRAME {transferFrame.Sequence}";
-        StreamLabel.Text = $"{_session.FramesEmitted:N0} frames emitted";
+        FrameLabel.Text = $"FRAME {transferFrame.Sequence.ToString(CultureInfo.InvariantCulture)}";
+        StreamLabel.Text = $"{_session.FramesEmitted.ToString("N0", CultureInfo.InvariantCulture)} frames emitted";
         var progress = Math.Min(1d, (double)_session.FramesEmitted / _framesTarget);
         ProgressBar.Value = progress;
-        ProgressLabel.Text = $"{progress:P0}";
+        ProgressLabel.Text = progress.ToString("P0", CultureInfo.InvariantCulture);
 
         var seconds = _clock.Elapsed.TotalSeconds;
         if (seconds > 0)
-            SpeedLabel.Text = $"{_session.FramesEmitted / seconds:0.0} fps";
+            SpeedLabel.Text = $"{(_session.FramesEmitted / seconds).ToString("0.0", CultureInfo.InvariantCulture)} fps";
 
         if (_session.FramesEmitted >= _framesTarget)
         {
