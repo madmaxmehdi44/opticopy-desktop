@@ -7,6 +7,11 @@ namespace OptiCopy.Tests;
 
 public sealed class DecimenInteropTests
 {
+    private static readonly int[] Systematic0 = [0];
+    private static readonly int[] Systematic1 = [1];
+    private static readonly int[] Systematic2 = [2];
+    private static readonly int[] Systematic3 = [3];
+
     [Fact]
     public void FrameUsesLittleEndianWireLayout()
     {
@@ -72,9 +77,9 @@ public sealed class DecimenInteropTests
     public void CarouselSystematicFramesMatchBlockPositions()
     {
         var encoder = new CarouselFountainEncoder(Enumerable.Range(0, 32).Select(static i => (byte)i).ToArray(), 8, 7);
-        Assert.Equal(new[] { 0 }, FrameComposition.Compose(encoder.SourceBlocks, encoder.SessionId, 0));
-        Assert.Equal(new[] { 1 }, FrameComposition.Compose(encoder.SourceBlocks, encoder.SessionId, 1));
-        Assert.Equal(new[] { 2 }, FrameComposition.Compose(encoder.SourceBlocks, encoder.SessionId, 2));
-        Assert.Equal(new[] { 3 }, FrameComposition.Compose(encoder.SourceBlocks, encoder.SessionId, 3));
+        Assert.Equal(Systematic0, FrameComposition.Compose(encoder.SourceBlocks, encoder.SessionId, 0));
+        Assert.Equal(Systematic1, FrameComposition.Compose(encoder.SourceBlocks, encoder.SessionId, 1));
+        Assert.Equal(Systematic2, FrameComposition.Compose(encoder.SourceBlocks, encoder.SessionId, 2));
+        Assert.Equal(Systematic3, FrameComposition.Compose(encoder.SourceBlocks, encoder.SessionId, 3));
     }
 }
