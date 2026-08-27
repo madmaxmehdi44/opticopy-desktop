@@ -24,7 +24,7 @@ public sealed record QrCodeOptions(
 
 public sealed class QrCodeGenerator
 {
-    public QrMatrix Generate(string content, QrCodeOptions? options = null)
+    public static QrMatrix Generate(string content, QrCodeOptions? options = null)
     {
         ArgumentException.ThrowIfNullOrEmpty(content);
         options ??= new QrCodeOptions();
@@ -53,7 +53,7 @@ public sealed class QrCodeGenerator
         return new QrMatrix(matrix.Width, matrix.Height, modules);
     }
 
-    public QrMatrix GenerateUtf8(ReadOnlySpan<byte> utf8Content, QrCodeOptions? options = null)
+    public static QrMatrix GenerateUtf8(ReadOnlySpan<byte> utf8Content, QrCodeOptions? options = null)
     {
         return Generate(Encoding.UTF8.GetString(utf8Content), options);
     }
