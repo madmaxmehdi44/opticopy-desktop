@@ -5,6 +5,8 @@ using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Media.Imaging;
 using OptiCopy.Core.Transfer;
 using OptiCopy.Imaging.Qr;
+using global::System.Runtime.InteropServices.WindowsRuntime;
+using global::Windows.Graphics.Imaging;
 using global::Windows.Storage.Pickers;
 using WinRT.Interop;
 
@@ -16,6 +18,7 @@ public sealed partial class SenderPage : Page
     private readonly Stopwatch _clock = new();
     private OpticalTransferSession? _session;
     private uint _framesTarget;
+    private bool _renderInProgress;
 
     public SenderPage()
     {
@@ -38,7 +41,7 @@ public sealed partial class SenderPage : Page
         try
         {
             var buffer = await global::Windows.Storage.FileIO.ReadBufferAsync(file);
-            var payload = global::System.Runtime.InteropServices.WindowsRuntime.WindowsRuntimeBufferExtensions.ToArray(buffer);
+            var payload = buffer.ToArray();
             _session = OpticalTransferSession.Create(payload, file.Name, "application/octet-stream", CreateSessionId());
             _framesTarget = Math.Max(_session.MinimumFrames, 1u);
 
@@ -69,7 +72,8 @@ public sealed partial class SenderPage : Page
         if (_session is null) return;
         _session.Reset();
         _clock.Restart();
-        RenderFrame();
+        _renderInProgress = false;
+        _ = RenderFrameAsync();
         _timer.Start();
         StartButton.IsEnabled = false;
         PauseButton.IsEnabled = true;
@@ -103,6 +107,7 @@ public sealed partial class SenderPage : Page
         _timer.Stop();
         _clock.Stop();
         _session?.Reset();
+        _renderInProgress = false;
         ProgressBar.Value = 0;
         ProgressLabel.Text = "0%";
         SpeedLabel.Text = "— fps";
@@ -115,61 +120,75 @@ public sealed partial class SenderPage : Page
         StartButton.IsEnabled = _session is not null;
     }
 
-    private void Timer_Tick(object? sender, object e) => RenderFrame();
-
-    private void RenderFrame()
+    private void Timer_Tick(object? sender, object e)
     {
-        if (_session is null) return;
+        if (_renderInProgress) return;
+        _ = RenderFrameAsync();
+    }
 
-        var transferFrame = _session.NextFrame();
-        var matrix = QrCodeGenerator.Generate(
-            transferFrame.PayloadBase64,
-            new QrCodeOptions(560, 560, 8, QrErrorCorrection.Medium, true));
+    private async Task RenderFrameAsync()
+    {
+        if (_session is null || _renderInProgress) return;
+        _renderInProgress = true;
 
-        var pixels = new byte[checked(matrix.Width * matrix.Height * 4)];
-        for (var y = 0; y < matrix.Height; y++)
+        try
         {
-            for (var x = 0; x < matrix.Width; x++)
+            var transferFrame = _session.NextFrame();
+            var matrix = QrCodeGenerator.Generate(
+                transferFrame.PayloadBase64,
+                new QrCodeOptions(560, 560, 8, QrErrorCorrection.Medium, true));
+
+            var pixels = new byte[checked(matrix.Width * matrix.Height * 4)];
+            for (var y = 0; y < matrix.Height; y++)
             {
-                var offset = checked((y * matrix.Width + x) * 4);
-                var value = matrix[x, y] ? (byte)0 : (byte)255;
-                pixels[offset] = value;
-                pixels[offset + 1] = value;
-                pixels[offset + 2] = value;
-                pixels[offset + 3] = 255;
+                for (var x = 0; x < matrix.Width; x++)
+                {
+                    var offset = checked((y * matrix.Width + x) * 4);
+                    var value = matrix[x, y] ? (byte)0 : (byte)255;
+                    pixels[offset] = value;
+                    pixels[offset + 1] = value;
+                    pixels[offset + 2] = value;
+                    pixels[offset + 3] = 255;
+                }
+            }
+
+            QrImage.Source = await CreateBitmapAsync(pixels, matrix.Width, matrix.Height);
+            FrameLabel.Text = $"FRAME {transferFrame.Sequence.ToString(CultureInfo.InvariantCulture)}";
+            StreamLabel.Text = $"{_session.FramesEmitted.ToString("N0", CultureInfo.InvariantCulture)} frames emitted";
+            var progress = Math.Min(1d, (double)_session.FramesEmitted / _framesTarget);
+            ProgressBar.Value = progress;
+            ProgressLabel.Text = progress.ToString("P0", CultureInfo.InvariantCulture);
+
+            var seconds = _clock.Elapsed.TotalSeconds;
+            if (seconds > 0)
+                SpeedLabel.Text = $"{(_session.FramesEmitted / seconds).ToString("0.0", CultureInfo.InvariantCulture)} fps";
+
+            if (_session.FramesEmitted >= _framesTarget)
+            {
+                _timer.Stop();
+                _clock.Stop();
+                PauseButton.IsEnabled = false;
+                StopButton.IsEnabled = false;
+                StartButton.IsEnabled = true;
+                PauseButton.Content = "Pause";
+                EngineStatus.Text = "COMPLETE";
+                StatusLabel.Text = "CYCLE COMPLETE";
             }
         }
-
-        QrImage.Source = CreateBitmap(pixels, matrix.Width, matrix.Height);
-        FrameLabel.Text = $"FRAME {transferFrame.Sequence.ToString(CultureInfo.InvariantCulture)}";
-        StreamLabel.Text = $"{_session.FramesEmitted.ToString("N0", CultureInfo.InvariantCulture)} frames emitted";
-        var progress = Math.Min(1d, (double)_session.FramesEmitted / _framesTarget);
-        ProgressBar.Value = progress;
-        ProgressLabel.Text = progress.ToString("P0", CultureInfo.InvariantCulture);
-
-        var seconds = _clock.Elapsed.TotalSeconds;
-        if (seconds > 0)
-            SpeedLabel.Text = $"{(_session.FramesEmitted / seconds).ToString("0.0", CultureInfo.InvariantCulture)} fps";
-
-        if (_session.FramesEmitted >= _framesTarget)
+        finally
         {
-            _timer.Stop();
-            _clock.Stop();
-            PauseButton.IsEnabled = false;
-            StopButton.IsEnabled = false;
-            StartButton.IsEnabled = true;
-            PauseButton.Content = "Pause";
-            EngineStatus.Text = "COMPLETE";
-            StatusLabel.Text = "CYCLE COMPLETE";
+            _renderInProgress = false;
         }
     }
 
-    private static BitmapImage CreateBitmap(byte[] pixels, int width, int height)
+    private static async Task<SoftwareBitmapSource> CreateBitmapAsync(byte[] pixels, int width, int height)
     {
-        _ = pixels;
-        _ = width;
-        _ = height;
-        return new BitmapImage();
+        using var bitmap = new SoftwareBitmap(BitmapPixelFormat.Rgba8, width, height, BitmapAlphaMode.Premultiplied);
+        bitmap.CopyFromBuffer(pixels.AsBuffer());
+
+        var source = new SoftwareBitmapSource();
+        await source.SetBitmapAsync(bitmap);
+        return source;
     }
 
     private static ushort CreateSessionId()
@@ -189,6 +208,6 @@ public sealed partial class SenderPage : Page
             unit++;
         }
 
-        return $"{value:0.##} {units[unit]}";
+        return $"{value.ToString("0.##", CultureInfo.InvariantCulture)} {units[unit]}";
     }
 }
