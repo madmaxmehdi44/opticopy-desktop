@@ -1,5 +1,6 @@
 using OptiCopy.Core.Protocol;
 using OptiCopy.Core.Transfer;
+using Xunit;
 
 namespace OptiCopy.Tests;
 
