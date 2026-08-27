@@ -2,7 +2,6 @@ namespace OptiCopy.Core.Fountain;
 
 public static class SplitMix32
 {
-    // Bit-exact port of shared/protocol.ts splitmix32().
     public static Func<uint> Create(uint seed)
     {
         var state = seed;
@@ -30,9 +29,7 @@ public static class FrameComposition
     {
         ArgumentOutOfRangeException.ThrowIfNegativeOrZero(k);
         var position = (int)(sequence % (uint)CycleLength(k));
-        return position < k
-            ? [position]
-            : RepairIndices(k, sessionId, sequence);
+        return position < k ? [position] : RepairIndices(k, sessionId, sequence);
     }
 
     private static int[] RepairIndices(int k, ushort sessionId, uint sequence)
@@ -40,8 +37,7 @@ public static class FrameComposition
         var rnd = SplitMix32.Create(FrameSeed(sessionId, sequence));
         var degree = Math.Min(k, RepairMin + (int)(rnd() % (RepairMax - RepairMin + 1)));
         var selected = new HashSet<int>();
-        while (selected.Count < degree)
-            selected.Add((int)(rnd() % (uint)k));
+        while (selected.Count < degree) selected.Add((int)(rnd() % (uint)k));
         return selected.ToArray();
     }
 
@@ -61,8 +57,7 @@ public sealed class CarouselFountainEncoder
     {
         if (blockLength is <= 0 or > ushort.MaxValue)
             throw new ArgumentOutOfRangeException(nameof(blockLength), blockLength, "Block length must be between 1 and UInt16.MaxValue.");
-        if (payload.IsEmpty)
-            throw new ArgumentException("Payload cannot be empty.", nameof(payload));
+        if (payload.IsEmpty) throw new ArgumentException("Payload cannot be empty.", nameof(payload));
 
         BlockLength = blockLength;
         SessionId = sessionId;
@@ -92,10 +87,7 @@ public sealed class CarouselFountainEncoder
         var indices = FrameComposition.Compose(SourceBlocks, SessionId, sequence);
         var output = new byte[BlockLength];
         foreach (var index in indices)
-        {
-            for (var i = 0; i < BlockLength; i++)
-                output[i] ^= _blocks[index][i];
-        }
+            for (var i = 0; i < BlockLength; i++) output[i] ^= _blocks[index][i];
         return output;
     }
 }
@@ -117,10 +109,8 @@ public sealed class CarouselFountainDecoder
         ArgumentOutOfRangeException.ThrowIfNegativeOrZero(sourceBlocks);
         ArgumentOutOfRangeException.ThrowIfNegativeOrZero(blockLength);
         ArgumentOutOfRangeException.ThrowIfNegative(totalLength);
-        if (sourceBlocks > ushort.MaxValue)
-            throw new ArgumentOutOfRangeException(nameof(sourceBlocks));
-        if (totalLength > Protocol.FrameCodec.MaxFileBytes)
-            throw new ArgumentOutOfRangeException(nameof(totalLength));
+        if (sourceBlocks > ushort.MaxValue) throw new ArgumentOutOfRangeException(nameof(sourceBlocks));
+        if (totalLength > global::OptiCopy.Core.Protocol.FrameCodec.MaxFileBytes) throw new ArgumentOutOfRangeException(nameof(totalLength));
 
         SourceBlocks = sourceBlocks;
         BlockLength = blockLength;
@@ -141,20 +131,13 @@ public sealed class CarouselFountainDecoder
 
     public void AddFrame(uint sequence, ReadOnlySpan<byte> payload)
     {
-        if (payload.Length < BlockLength)
-            throw new ArgumentException("Frame payload is shorter than block length.", nameof(payload));
-        if (!_seen.Add(sequence))
-        {
-            DuplicateFrames++;
-            return;
-        }
-
+        if (payload.Length < BlockLength) throw new ArgumentException("Frame payload is shorter than block length.", nameof(payload));
+        if (!_seen.Add(sequence)) { DuplicateFrames++; return; }
         NewFrames++;
         if (IsComplete) return;
 
         var indices = new HashSet<int>(FrameComposition.Compose(SourceBlocks, SessionId, sequence));
         var words = payload[..BlockLength].ToArray();
-
         foreach (var block in indices.ToArray())
         {
             if (_solved[block] is { } solved)
@@ -164,16 +147,8 @@ public sealed class CarouselFountainDecoder
             }
         }
 
-        if (indices.Count == 0)
-        {
-            RedundantFrames++;
-            return;
-        }
-        if (indices.Count == 1)
-        {
-            Resolve(indices.Single(), words);
-            return;
-        }
+        if (indices.Count == 0) { RedundantFrames++; return; }
+        if (indices.Count == 1) { Resolve(indices.Single(), words); return; }
 
         var pending = new Pending { Indices = indices, Words = words };
         foreach (var block in indices)
@@ -190,14 +165,12 @@ public sealed class CarouselFountainDecoder
     public byte[]? Assemble()
     {
         if (!IsComplete) return null;
-
         var result = new byte[TotalLength];
         for (var i = 0; i < SourceBlocks; i++)
         {
             var start = i * BlockLength;
             var length = Math.Min(BlockLength, TotalLength - start);
-            if (length > 0)
-                Buffer.BlockCopy(_solved[i]!, 0, result, start, length);
+            if (length > 0) Buffer.BlockCopy(_solved[i]!, 0, result, start, length);
         }
         return result;
     }
@@ -212,7 +185,6 @@ public sealed class CarouselFountainDecoder
             if (_solved[current] is not null) continue;
             _solved[current] = bytes;
             SolvedCount++;
-
             if (!_waiting.TryGetValue(current, out var waiting)) continue;
             _waiting.Remove(current);
             foreach (var pending in waiting.ToArray())
@@ -224,8 +196,7 @@ public sealed class CarouselFountainDecoder
                     var next = pending.Indices.Single();
                     _waiting.TryGetValue(next, out var set);
                     set?.Remove(pending);
-                    if (_solved[next] is null)
-                        queue.Push((next, pending.Words));
+                    if (_solved[next] is null) queue.Push((next, pending.Words));
                 }
             }
         }
@@ -233,7 +204,6 @@ public sealed class CarouselFountainDecoder
 
     private static void Xor(byte[] left, byte[] right)
     {
-        for (var i = 0; i < left.Length; i++)
-            left[i] ^= right[i];
+        for (var i = 0; i < left.Length; i++) left[i] ^= right[i];
     }
 }
