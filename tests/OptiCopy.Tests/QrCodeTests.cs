@@ -1,3 +1,4 @@
+using OptiCopy.Core.Protocol;
 using OptiCopy.Imaging.Qr;
 using Xunit;
 
@@ -19,6 +20,33 @@ public sealed class QrCodeTests
         Assert.NotNull(decoded);
         Assert.Equal(payload, decoded!.Text);
         Assert.Equal(ZXing.BarcodeFormat.QR_CODE, decoded.Format);
+    }
+
+    [Fact]
+    public void GenerateBinaryRoundTripsExactDecimenFrameBytes()
+    {
+        var payload = Enumerable.Range(0, 360).Select(static i => (byte)i).ToArray();
+        var frame = new Frame(
+            FrameCodec.WireVersion,
+            0,
+            0x1234,
+            7,
+            1,
+            (ushort)payload.Length,
+            (uint)payload.Length,
+            Fnv1a.Hash(payload),
+            payload);
+        var wire = FrameCodec.Encode(frame);
+
+        var matrix = QrCodeGenerator.GenerateBinary(
+            wire,
+            new QrCodeOptions(560, 560, 4, QrErrorCorrection.Low, true, "ISO-8859-1"));
+        var pixels = QrMatrixRasterizer.ToGray8(matrix);
+        var decoded = new QrCodeDecoder().Decode(pixels, matrix.Width, matrix.Height, QrPixelFormat.Gray8);
+
+        Assert.NotNull(decoded);
+        Assert.Equal(ZXing.BarcodeFormat.QR_CODE, decoded!.Format);
+        Assert.Equal(wire, decoded.RawBytes!.Select(static b => (byte)b).ToArray());
     }
 
     [Fact]
