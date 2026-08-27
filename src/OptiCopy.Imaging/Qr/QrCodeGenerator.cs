@@ -58,6 +58,24 @@ public sealed class QrCodeGenerator
         return Generate(Encoding.UTF8.GetString(utf8Content), options);
     }
 
+    public QrMatrix GenerateBinary(ReadOnlySpan<byte> content, QrCodeOptions? options = null)
+    {
+        if (content.IsEmpty)
+            throw new ArgumentException("QR payload cannot be empty.", nameof(content));
+
+        options ??= new QrCodeOptions(
+            CharacterSet: "ISO-8859-1",
+            DisableEci: true);
+
+        options = options with
+        {
+            CharacterSet = "ISO-8859-1",
+            DisableEci = true
+        };
+
+        return Generate(Encoding.Latin1.GetString(content), options);
+    }
+
     private static ZXing.QrCode.Internal.ErrorCorrectionLevel ToLevel(QrErrorCorrection correction) => correction switch
     {
         QrErrorCorrection.Low => ZXing.QrCode.Internal.ErrorCorrectionLevel.L,
