@@ -158,9 +158,10 @@ public sealed partial class SenderPage : Page
         try
         {
             var transferFrame = _session.NextFrame();
+            // Match the mobile OptiCopy QR defaults: low ECC and compact quiet zone.
             var matrix = QrCodeGenerator.Generate(
                 transferFrame.ProtocolPacket,
-                new QrCodeOptions(560, 560, 8, QrErrorCorrection.Medium, true));
+                new QrCodeOptions(560, 560, 4, QrErrorCorrection.Low, true, "UTF-8"));
 
             var pixels = new byte[checked(matrix.Width * matrix.Height * 4)];
             for (var y = 0; y < matrix.Height; y++)
@@ -178,7 +179,7 @@ public sealed partial class SenderPage : Page
 
             QrImage.Source = CreateBitmap(pixels, matrix.Width, matrix.Height);
             FrameLabel.Text = $"FRAME {transferFrame.Sequence.ToString(CultureInfo.InvariantCulture)}";
-            StreamLabel.Text = $"{_session.FramesEmitted.ToString("N0", CultureInfo.InvariantCulture)} frames emitted";
+            StreamLabel.Text = $"DOT3 • {transferFrame.ProtocolPacket.Length.ToString("N0", CultureInfo.InvariantCulture)} chars • {_session.FramesEmitted.ToString("N0", CultureInfo.InvariantCulture)} frames emitted";
             var progress = Math.Min(1d, (double)_session.FramesEmitted / _framesTarget);
             ProgressBar.Value = progress;
             ProgressLabel.Text = progress.ToString("P0", CultureInfo.InvariantCulture);
