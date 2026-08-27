@@ -1,0 +1,107 @@
+<Page
+    x:Class="OptiCopy.Windows.Pages.SenderPage"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    Background="{ThemeResource OptiBackgroundBrush}">
+    <Grid Padding="28">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+            <RowDefinition Height="Auto" />
+        </Grid.RowDefinitions>
+
+        <Grid>
+            <StackPanel Spacing="4">
+                <TextBlock Text="SEND FILE" FontSize="12" CharacterSpacing="180" FontWeight="SemiBold" Foreground="{ThemeResource OptiCyanBrush}" />
+                <TextBlock Text="Optical transmitter" FontSize="30" FontWeight="SemiBold" Foreground="{ThemeResource OptiTextPrimaryBrush}" />
+                <TextBlock Text="Display an animated QR stream for another OptiCopy receiver." FontSize="14" Foreground="{ThemeResource OptiTextSecondaryBrush}" />
+            </StackPanel>
+            <Button x:Name="ChooseFileButton" Content="Choose file" Click="ChooseFile_Click" HorizontalAlignment="Right" VerticalAlignment="Center" MinWidth="150" />
+        </Grid>
+
+        <Grid Grid.Row="1" Margin="0,22,0,18" ColumnSpacing="18">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="2*" />
+                <ColumnDefinition Width="*" />
+            </Grid.ColumnDefinitions>
+
+            <Border Grid.Column="0" Background="{ThemeResource OptiSurfaceBrush}" BorderBrush="{ThemeResource OptiCardBorderHighlightBrush}" BorderThickness="1" CornerRadius="20" Padding="22">
+                <Grid>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="*" />
+                        <RowDefinition Height="Auto" />
+                    </Grid.RowDefinitions>
+                    <Border Background="#FFFFFF" CornerRadius="14" Padding="12" HorizontalAlignment="Center" VerticalAlignment="Center">
+                        <Image x:Name="QrImage" Width="560" Height="560" Stretch="Uniform" />
+                    </Border>
+                    <Grid Grid.Row="1" Margin="0,18,0,0">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        <StackPanel Spacing="4">
+                            <TextBlock x:Name="FrameLabel" Text="READY" FontSize="18" FontWeight="SemiBold" Foreground="{ThemeResource OptiTextPrimaryBrush}" />
+                            <TextBlock x:Name="StreamLabel" Text="Select a file to generate the optical stream." FontSize="12" Foreground="{ThemeResource OptiTextSecondaryBrush}" />
+                        </StackPanel>
+                        <Border Grid.Column="1" Padding="12,7" CornerRadius="999" Background="{ThemeResource OptiSurfaceVariantBrush}" BorderBrush="{ThemeResource OptiCardBorderBrush}" BorderThickness="1">
+                            <TextBlock x:Name="EngineStatus" Text="IDLE" FontSize="11" FontWeight="SemiBold" Foreground="{ThemeResource OptiEmeraldBrush}" />
+                        </Border>
+                    </Grid>
+                </Grid>
+            </Border>
+
+            <StackPanel Grid.Column="1" Spacing="14">
+                <Border Background="{ThemeResource OptiSurfaceBrush}" BorderBrush="{ThemeResource OptiCardBorderBrush}" BorderThickness="1" CornerRadius="18" Padding="20">
+                    <StackPanel Spacing="12">
+                        <TextBlock Text="TRANSFER" FontSize="11" CharacterSpacing="160" Foreground="{ThemeResource OptiTextMutedBrush}" />
+                        <TextBlock x:Name="FileNameLabel" Text="No file selected" FontSize="18" FontWeight="SemiBold" TextWrapping="Wrap" Foreground="{ThemeResource OptiTextPrimaryBrush}" />
+                        <TextBlock x:Name="FileSizeLabel" Text="—" FontSize="12" Foreground="{ThemeResource OptiTextSecondaryBrush}" />
+                        <TextBlock x:Name="HashLabel" Text="SHA-256: —" FontSize="11" FontFamily="Consolas" TextWrapping="Wrap" Foreground="{ThemeResource OptiTextMutedBrush}" />
+                    </StackPanel>
+                </Border>
+
+                <Border Background="{ThemeResource OptiSurfaceBrush}" BorderBrush="{ThemeResource OptiCardBorderBrush}" BorderThickness="1" CornerRadius="18" Padding="20">
+                    <StackPanel Spacing="12">
+                        <TextBlock Text="OPTICAL ENGINE" FontSize="11" CharacterSpacing="160" Foreground="{ThemeResource OptiTextMutedBrush}" />
+                        <Grid>
+                            <Grid.ColumnDefinitions><ColumnDefinition/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+                            <TextBlock Text="Source blocks" Foreground="{ThemeResource OptiTextSecondaryBrush}" />
+                            <TextBlock x:Name="BlocksLabel" Grid.Column="1" Text="—" FontFamily="Consolas" Foreground="{ThemeResource OptiTextPrimaryBrush}" />
+                        </Grid>
+                        <Grid>
+                            <Grid.ColumnDefinitions><ColumnDefinition/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+                            <TextBlock Text="Block length" Foreground="{ThemeResource OptiTextSecondaryBrush}" />
+                            <TextBlock x:Name="BlockLengthLabel" Grid.Column="1" Text="—" FontFamily="Consolas" Foreground="{ThemeResource OptiTextPrimaryBrush}" />
+                        </Grid>
+                        <Grid>
+                            <Grid.ColumnDefinitions><ColumnDefinition/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+                            <TextBlock Text="Frames in cycle" Foreground="{ThemeResource OptiTextSecondaryBrush}" />
+                            <TextBlock x:Name="CycleLabel" Grid.Column="1" Text="—" FontFamily="Consolas" Foreground="{ThemeResource OptiTextPrimaryBrush}" />
+                        </Grid>
+                    </StackPanel>
+                </Border>
+
+                <Border Background="{ThemeResource OptiSurfaceBrush}" BorderBrush="{ThemeResource OptiCardBorderBrush}" BorderThickness="1" CornerRadius="18" Padding="20">
+                    <StackPanel Spacing="12">
+                        <TextBlock Text="TRANSMISSION" FontSize="11" CharacterSpacing="160" Foreground="{ThemeResource OptiTextMutedBrush}" />
+                        <ProgressBar x:Name="ProgressBar" Minimum="0" Maximum="1" Value="0" Height="8" />
+                        <Grid>
+                            <Grid.ColumnDefinitions><ColumnDefinition/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+                            <TextBlock x:Name="ProgressLabel" Text="0%" Foreground="{ThemeResource OptiTextPrimaryBrush}" />
+                            <TextBlock x:Name="SpeedLabel" Grid.Column="1" Text="— fps" FontFamily="Consolas" Foreground="{ThemeResource OptiCyanBrush}" />
+                        </Grid>
+                    </StackPanel>
+                </Border>
+            </StackPanel>
+        </Grid>
+
+        <Grid Grid.Row="2">
+            <StackPanel Orientation="Horizontal" Spacing="10">
+                <Button x:Name="StartButton" Content="Start transmission" Click="Start_Click" MinWidth="170" Background="{ThemeResource OptiCyanBrush}" Foreground="{ThemeResource OptiObsidianBrush}" />
+                <Button x:Name="PauseButton" Content="Pause" Click="Pause_Click" MinWidth="100" IsEnabled="False" />
+                <Button x:Name="StopButton" Content="Stop" Click="Stop_Click" MinWidth="100" IsEnabled="False" />
+            </StackPanel>
+            <TextBlock x:Name="StatusLabel" Text="READY" HorizontalAlignment="Right" VerticalAlignment="Center" FontSize="11" FontWeight="SemiBold" Foreground="{ThemeResource OptiEmeraldBrush}" />
+        </Grid>
+    </Grid>
+</Page>
