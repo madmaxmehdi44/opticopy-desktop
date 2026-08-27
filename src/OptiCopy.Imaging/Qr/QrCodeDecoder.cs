@@ -44,7 +44,32 @@ public sealed class QrCodeDecoder
             throw new ArgumentException("Pixel buffer is shorter than the declared image dimensions.", nameof(pixels));
 
         var result = _reader.Decode(pixels[..expectedLength].ToArray(), width, height, ToBitmapFormat(pixelFormat));
-        return result is null ? null : new QrDecodeResult(result.Text, result.BarcodeFormat, result.RawBytes?.Select(static b => (int)b).ToArray());
+        if (result is null)
+            return null;
+
+        // ZXing's Result.RawBytes are the QR code's raw codewords, not the
+        // decoded byte-mode payload. Decimen frames are deliberately binary,
+        // so expose BYTE_SEGMENTS as RawBytes when available.
+        var rawBytes = result.RawBytes;
+        if (result.ResultMetadata is not null &&
+            result.ResultMetadata.TryGetValue(ResultMetadataType.BYTE_SEGMENTS, out var segments) &&
+            segments is System.Collections.IEnumerable enumerable)
+        {
+            var bytes = new List<byte>();
+            foreach (var segment in enumerable)
+            {
+                if (segment is byte[] segmentBytes)
+                    bytes.AddRange(segmentBytes);
+            }
+
+            if (bytes.Count > 0)
+                rawBytes = bytes.ToArray();
+        }
+
+        return new QrDecodeResult(
+            result.Text,
+            result.BarcodeFormat,
+            rawBytes?.Select(static b => (int)b).ToArray());
     }
 
     private static RGBLuminanceSource.BitmapFormat ToBitmapFormat(QrPixelFormat pixelFormat) => pixelFormat switch
