@@ -55,10 +55,12 @@ public sealed class OpticalTransferSession
         ArgumentOutOfRangeException.ThrowIfZero(sessionId);
         ArgumentOutOfRangeException.ThrowIfZero(blockLength);
         if (repairFramesPerBlock == 0) throw new ArgumentOutOfRangeException(nameof(repairFramesPerBlock));
+        if (payload.LongLength > uint.MaxValue)
+            throw new NotSupportedException("The current wire format supports payloads up to 4 GiB.");
 
         var sha256 = Convert.ToHexString(SHA256.HashData(payload)).ToLowerInvariant();
         var encoder = new CarouselFountainEncoder(payload, blockLength, sessionId);
-        var hint = checked((uint)Math.Max(encoder.SourceBlocks, encoder.SourceBlocks * repairFramesPerBlock));
+        var hint = checked((uint)encoder.SourceBlocks * 2u);
         var metadata = new OpticalTransferMetadata(
             sessionId,
             SanitizeMetadata(fileName),
@@ -89,6 +91,12 @@ public sealed class OpticalTransferSession
             encoded);
 
         return new OpticalTransferFrame(sequence, frame, Convert.ToBase64String(FrameCodec.Encode(frame)));
+    }
+
+    public void Reset()
+    {
+        Sequence = 0;
+        FramesEmitted = 0;
     }
 
     public uint MinimumFrames => _frameCountHint;
