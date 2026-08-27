@@ -1,3 +1,4 @@
+using System.Globalization;
 using OptiCopy.Core.Protocol;
 using OptiCopy.Core.Transfer;
 using Xunit;
@@ -27,7 +28,7 @@ public sealed class OpticalTransferSessionTests
         Assert.Equal("0", parts[2]);
         Assert.Equal("8", parts[3]);
         Assert.Equal("8", parts[4]);
-        Assert.Equal(payload.Length.ToString(), parts[5]);
+        Assert.Equal(payload.Length.ToString(CultureInfo.InvariantCulture), parts[5]);
         Assert.Equal(session.Metadata.Sha256, parts[6]);
         Assert.Equal("0", parts[7]);
         Assert.Equal("application/octet-stream", parts[8]);
