@@ -52,8 +52,6 @@ public static class FrameCodec
             throw new ArgumentException("Frame contains unsupported critical flags.", nameof(frame));
         if (frame.SourceBlocks == 0 || frame.BlockLength == 0)
             throw new ArgumentException("SourceBlocks and BlockLength must be non-zero.", nameof(frame));
-        if (frame.TotalLength == 0 || frame.TotalLength > MaxFileBytes)
-            throw new ArgumentOutOfRangeException(nameof(frame), "TotalLength must be between 1 byte and 64 MiB.");
         if (frame.Payload.Length != frame.BlockLength)
             throw new ArgumentException("Payload length must equal BlockLength.", nameof(frame));
 
@@ -91,11 +89,9 @@ public static class FrameCodec
         if (version == 0)
             return new(FrameVerdictKind.Malformed, version);
         if (version != WireVersion)
-        {
             return version > WireVersion
                 ? new(FrameVerdictKind.NewerSender, version)
                 : new(FrameVerdictKind.OlderSender, version);
-        }
 
         var unknownCritical = (byte)(data[3] & CriticalFlags & ~SupportedFlags);
         if (unknownCritical != 0)
@@ -107,8 +103,7 @@ public static class FrameCodec
         var sourceBlocks = BinaryPrimitives.ReadUInt16LittleEndian(data.Slice(10, 2));
         var blockLength = BinaryPrimitives.ReadUInt16LittleEndian(data.Slice(12, 2));
         var totalLength = BinaryPrimitives.ReadUInt32LittleEndian(data.Slice(14, 4));
-
-        if (sourceBlocks == 0 || blockLength == 0 || totalLength == 0 || totalLength > MaxFileBytes)
+        if (sourceBlocks == 0 || blockLength == 0 || totalLength == 0)
             return new(FrameVerdictKind.Malformed, version);
         if (data.Length != HeaderLength + blockLength)
             return new(FrameVerdictKind.Malformed, version);
@@ -146,7 +141,7 @@ public static class FrameCodec
 
     public static string StreamIdentity(FrameHeader header)
     {
-        var critical = header.Flags & CriticalFlags;
+        var critical = (byte)(header.Flags & CriticalFlags);
         return $"{header.SessionId}:{header.SourceBlocks}:{header.BlockLength}:{header.TotalLength}:{header.PayloadFnv}:{critical}";
     }
 }
