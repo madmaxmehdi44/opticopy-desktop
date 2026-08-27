@@ -3,6 +3,7 @@ using System.Globalization;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Media.Imaging;
+using OptiCopy.Core.Protocol;
 using OptiCopy.Core.Transfer;
 using OptiCopy.Imaging.Qr;
 using global::System.Runtime.InteropServices.WindowsRuntime;
@@ -71,7 +72,7 @@ public sealed partial class SenderPage : Page
             BlockLengthLabel.Text = _session.Metadata.BlockLength.ToString(CultureInfo.InvariantCulture);
             CycleLabel.Text = _framesTarget.ToString(CultureInfo.InvariantCulture);
             FrameLabel.Text = "READY";
-            StreamLabel.Text = "File loaded. Start transmission.";
+            StreamLabel.Text = "Decimen v3 binary stream ready. Start transmission.";
             EngineStatus.Text = "READY";
             StatusLabel.Text = "READY";
             ProgressBar.Value = 0;
@@ -158,10 +159,13 @@ public sealed partial class SenderPage : Page
         try
         {
             var transferFrame = _session.NextFrame();
-            // Match the mobile OptiCopy QR defaults: low ECC and compact quiet zone.
-            var matrix = QrCodeGenerator.Generate(
-                transferFrame.ProtocolPacket,
-                new QrCodeOptions(560, 560, 4, QrErrorCorrection.Low, true, "UTF-8"));
+            var wireBytes = FrameCodec.Encode(transferFrame.Frame);
+
+            // The mobile receiver expects the Decimen v3 binary frame directly
+            // in QR byte mode. Do not encode the old DOT3 pipe-delimited string.
+            var matrix = QrCodeGenerator.GenerateBinary(
+                wireBytes,
+                new QrCodeOptions(560, 560, 4, QrErrorCorrection.Low, true, "ISO-8859-1"));
 
             var pixels = new byte[checked(matrix.Width * matrix.Height * 4)];
             for (var y = 0; y < matrix.Height; y++)
@@ -179,7 +183,7 @@ public sealed partial class SenderPage : Page
 
             QrImage.Source = CreateBitmap(pixels, matrix.Width, matrix.Height);
             FrameLabel.Text = $"FRAME {transferFrame.Sequence.ToString(CultureInfo.InvariantCulture)}";
-            StreamLabel.Text = $"DOT3 • {transferFrame.ProtocolPacket.Length.ToString("N0", CultureInfo.InvariantCulture)} chars • {_session.FramesEmitted.ToString("N0", CultureInfo.InvariantCulture)} frames emitted";
+            StreamLabel.Text = $"DECIMEN V3 • {wireBytes.Length.ToString("N0", CultureInfo.InvariantCulture)} bytes • {_session.FramesEmitted.ToString("N0", CultureInfo.InvariantCulture)} frames emitted";
             var progress = Math.Min(1d, (double)_session.FramesEmitted / _framesTarget);
             ProgressBar.Value = progress;
             ProgressLabel.Text = progress.ToString("P0", CultureInfo.InvariantCulture);
@@ -196,7 +200,7 @@ public sealed partial class SenderPage : Page
                 StopButton.IsEnabled = false;
                 StartButton.IsEnabled = true;
                 PauseButton.Content = "Pause";
-                EngineStatus.Text = "COMPLETE";
+                EngineStatus.Text = "CYCLE COMPLETE";
                 StatusLabel.Text = "CYCLE COMPLETE";
             }
         }
