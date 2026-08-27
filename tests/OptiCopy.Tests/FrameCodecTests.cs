@@ -5,7 +5,7 @@ namespace OptiCopy.Tests;
 public sealed class FrameCodecTests
 {
     [Fact]
-    public void EncodeDecode_RoundTripsFrame()
+    public void EncodeDecodeRoundTripsFrame()
     {
         var payload = Enumerable.Range(0, 32).Select(static i => (byte)i).ToArray();
         var frame = new Frame(
