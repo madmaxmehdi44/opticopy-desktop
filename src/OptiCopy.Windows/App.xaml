@@ -4,7 +4,10 @@
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
     <Application.Resources>
         <ResourceDictionary>
-            <XamlControlsResources xmlns="using:Microsoft.UI.Xaml.Controls" />
+            <ResourceDictionary.MergedDictionaries>
+                <XamlControlsResources xmlns="using:Microsoft.UI.Xaml.Controls" />
+            </ResourceDictionary.MergedDictionaries>
+
             <ResourceDictionary.ThemeDictionaries>
                 <ResourceDictionary x:Key="Dark">
                     <Color x:Key="OptiObsidianDark">#0A0E17</Color>
@@ -40,6 +43,7 @@
                     <SolidColorBrush x:Key="OptiCardBorderBrush" Color="{StaticResource OptiCardBorder}" />
                     <SolidColorBrush x:Key="OptiCardBorderHighlightBrush" Color="{StaticResource OptiCardBorderHighlight}" />
                 </ResourceDictionary>
+
                 <ResourceDictionary x:Key="Light">
                     <Color x:Key="OptiObsidianDark">#F8FAFC</Color>
                     <Color x:Key="OptiSlateBackground">#E2E8F0</Color>
@@ -75,6 +79,7 @@
                     <SolidColorBrush x:Key="OptiCardBorderHighlightBrush" Color="{StaticResource OptiCardBorderHighlight}" />
                 </ResourceDictionary>
             </ResourceDictionary.ThemeDictionaries>
+
             <Thickness x:Key="OptiCardPadding">22</Thickness>
             <CornerRadius x:Key="OptiCardRadius">18</CornerRadius>
         </ResourceDictionary>
