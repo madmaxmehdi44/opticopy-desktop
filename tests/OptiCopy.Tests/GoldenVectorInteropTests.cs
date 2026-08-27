@@ -1,5 +1,4 @@
 using System.Linq;
-using System.Text;
 using OptiCopy.Core.Fountain;
 using OptiCopy.Core.Protocol;
 using Xunit;
@@ -32,44 +31,56 @@ public sealed class GoldenVectorInteropTests
     [Fact]
     public void ClassificationVectorsMatchDecimenSemantics()
     {
-        Assert.Equal(FrameVerdictKind.Ok,
-            FrameCodec.Classify([0xD1, 0xC3, 0x03, 0x00]).Kind);
+        var valid = FrameCodec.Encode(new Frame(
+            FrameCodec.WireVersion, 0, 0xBEEF, 0x01020304, 0x0111, 6,
+            0x00FEDCBA, 0x89ABCDEF, [1, 2, 3, 4, 5, 6]));
 
-        Assert.Equal(FrameVerdictKind.OlderSender,
-            FrameCodec.Classify([0xD1, 0x0C, 0x03, 0x00]).Kind);
-        Assert.Equal(1, FrameCodec.Classify([0xD1, 0x0C, 0x03, 0x00]).Version);
+        Assert.Equal(FrameVerdictKind.Ok, FrameCodec.Classify(valid).Kind);
 
-        Assert.Equal(FrameVerdictKind.OlderSender,
-            FrameCodec.Classify([0xD1, 0x0D, 0x03, 0x00]).Kind);
-        Assert.Equal(2, FrameCodec.Classify([0xD1, 0x0D, 0x03, 0x00]).Version);
+        var legacyV1 = valid.ToArray();
+        legacyV1[1] = 0x0C;
+        Assert.Equal(FrameVerdictKind.OlderSender, FrameCodec.Classify(legacyV1).Kind);
+        Assert.Equal(1, FrameCodec.Classify(legacyV1).Version);
 
-        Assert.Equal(FrameVerdictKind.Foreign,
-            FrameCodec.Classify([0xD1, 0x42, 0x03, 0x00]).Kind);
-        Assert.Equal(FrameVerdictKind.Foreign,
-            FrameCodec.Classify([0xD2, 0xC3, 0x03, 0x00]).Kind);
+        var legacyV2 = valid.ToArray();
+        legacyV2[1] = 0x0D;
+        Assert.Equal(FrameVerdictKind.OlderSender, FrameCodec.Classify(legacyV2).Kind);
+        Assert.Equal(2, FrameCodec.Classify(legacyV2).Version);
 
-        Assert.Equal(FrameVerdictKind.NewerSender,
-            FrameCodec.Classify([0xD1, 0xC3, 0x04, 0x00]).Kind);
-        Assert.Equal(4, FrameCodec.Classify([0xD1, 0xC3, 0x04, 0x00]).Version);
+        var foreign = valid.ToArray();
+        foreign[1] = 0x42;
+        Assert.Equal(FrameVerdictKind.Foreign, FrameCodec.Classify(foreign).Kind);
 
-        Assert.Equal(FrameVerdictKind.OlderSender,
-            FrameCodec.Classify([0xD1, 0xC3, 0x02, 0x00]).Kind);
-        Assert.Equal(2, FrameCodec.Classify([0xD1, 0xC3, 0x02, 0x00]).Version);
+        var wrongMagic = valid.ToArray();
+        wrongMagic[0] = 0xD2;
+        Assert.Equal(FrameVerdictKind.Foreign, FrameCodec.Classify(wrongMagic).Kind);
 
-        Assert.Equal(FrameVerdictKind.Malformed,
-            FrameCodec.Classify([0xD1, 0xC3, 0x00, 0x00]).Kind);
+        var newer = valid.ToArray();
+        newer[2] = 4;
+        Assert.Equal(FrameVerdictKind.NewerSender, FrameCodec.Classify(newer).Kind);
+        Assert.Equal(4, FrameCodec.Classify(newer).Version);
+
+        var older = valid.ToArray();
+        older[2] = 2;
+        Assert.Equal(FrameVerdictKind.OlderSender, FrameCodec.Classify(older).Kind);
+        Assert.Equal(2, FrameCodec.Classify(older).Version);
+
+        var zeroVersion = valid.ToArray();
+        zeroVersion[2] = 0;
+        Assert.Equal(FrameVerdictKind.Malformed, FrameCodec.Classify(zeroVersion).Kind);
     }
 
     [Fact]
     public void CriticalAndIgnorableFlagsMatchDecimenSemantics()
     {
-        Assert.Equal(FrameVerdictKind.UnsupportedFlags,
-            FrameCodec.Classify([0xD1, 0xC3, 0x03, 0x01]).Kind);
+        var critical = FrameCodec.Encode(new Frame(
+            FrameCodec.WireVersion, 0x01, 1, 0, 1, 4, 4, 0, [1, 2, 3, 4]));
+        Assert.Equal(FrameVerdictKind.UnsupportedFlags, FrameCodec.Classify(critical).Kind);
 
-        var frame = new Frame(FrameCodec.WireVersion, 0x10, 1, 0, 1, 4, 4, 0, [1, 2, 3, 4]);
-        var encoded = FrameCodec.Encode(frame);
-        Assert.Equal(FrameVerdictKind.Ok, FrameCodec.Classify(encoded).Kind);
-        Assert.True(FrameCodec.TryDecode(encoded, out var decoded));
+        var ignorable = FrameCodec.Encode(new Frame(
+            FrameCodec.WireVersion, 0x10, 1, 0, 1, 4, 4, 0, [1, 2, 3, 4]));
+        Assert.Equal(FrameVerdictKind.Ok, FrameCodec.Classify(ignorable).Kind);
+        Assert.True(FrameCodec.TryDecode(ignorable, out var decoded));
         Assert.Equal((byte)0x10, decoded.Flags);
     }
 
@@ -113,10 +124,10 @@ public sealed class GoldenVectorInteropTests
         var expected25 = new[] { 3, 8, 11, 15, 17, 20 };
         var expected26 = new[] { 10, 11, 13, 22 };
 
-        Assert.Equal(expected23, FrameComposition.Compose(23, 7, 23).OrderBy(x => x));
-        Assert.Equal(expected24, FrameComposition.Compose(23, 7, 24).OrderBy(x => x));
-        Assert.Equal(expected25, FrameComposition.Compose(23, 7, 25).OrderBy(x => x));
-        Assert.Equal(expected26, FrameComposition.Compose(23, 7, 26).OrderBy(x => x));
+        Assert.Equal(expected23, FrameComposition.Compose(23, 7, 23).OrderBy(x => x).ToArray());
+        Assert.Equal(expected24, FrameComposition.Compose(23, 7, 24).OrderBy(x => x).ToArray());
+        Assert.Equal(expected25, FrameComposition.Compose(23, 7, 25).OrderBy(x => x).ToArray());
+        Assert.Equal(expected26, FrameComposition.Compose(23, 7, 26).OrderBy(x => x).ToArray());
     }
 
     [Fact]
@@ -141,10 +152,7 @@ public sealed class GoldenVectorInteropTests
             "payload.bin",
             "application/octet-stream",
             source);
-        var encoder = new CarouselFountainEncoder(
-            packed.Container,
-            blockLength,
-            0xBEEF);
+        var encoder = new CarouselFountainEncoder(packed.Container, blockLength, 0xBEEF);
         var payloadFnv = Fnv1a.Hash(packed.Container);
 
         Assert.True(encoder.SourceBlocks > 100);
@@ -190,7 +198,8 @@ public sealed class GoldenVectorInteropTests
         Assert.True(OpticalFileContainer.VerifySha256(file));
         Assert.Equal("payload.bin", file.Name);
         Assert.Equal(source, file.Bytes);
-        Assert.True((double)fed / encoder.SourceBlocks < 1.3, $"Overhead {(double)fed / encoder.SourceBlocks:0.000}x is too high.");
+        Assert.True((double)fed / encoder.SourceBlocks < 1.3,
+            $"Overhead {(double)fed / encoder.SourceBlocks:0.000}x is too high.");
     }
 
     private static byte[] MakeNoise(int length, uint seed)
