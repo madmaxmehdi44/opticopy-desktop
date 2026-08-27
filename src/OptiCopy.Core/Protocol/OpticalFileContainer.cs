@@ -59,9 +59,9 @@ public static class OpticalFileContainer
 
     public static async Task<UnpackedFile> UnpackAsync(ReadOnlyMemory<byte> container, CancellationToken cancellationToken = default)
     {
-        var data = container.Span;
+        var data = container.ToArray();
         if (data.Length < HeaderLength) throw new InvalidDataException("The DCF2 container is truncated.");
-        if (!data[..Magic.Length].SequenceEqual(Magic)) throw new InvalidDataException("Invalid DCF2 magic.");
+        if (!data.AsSpan(0, Magic.Length).SequenceEqual(Magic)) throw new InvalidDataException("Invalid DCF2 magic.");
 
         var compressionByte = data[4];
         if (compressionByte > (byte)CompressionMode.Gzip) throw new InvalidDataException("Unsupported DCF2 compression mode.");
@@ -75,7 +75,7 @@ public static class OpticalFileContainer
         if (fileLength == 0 || fileLength > MaxFileBytes || transmittedLength == 0 || transmittedLength > MaxFileBytes || dataOffset + transmittedLength != data.Length)
             throw new InvalidDataException("DCF2 container lengths do not match.");
 
-        var transmitted = data.Slice(dataOffset, checked((int)transmittedLength)).ToArray();
+        var transmitted = data.AsSpan(dataOffset, checked((int)transmittedLength)).ToArray();
         byte[] bytes;
         if (compression == CompressionMode.Gzip)
         {
@@ -90,10 +90,10 @@ public static class OpticalFileContainer
         }
 
         if (bytes.Length != fileLength) throw new InvalidDataException("The decompressed length does not match the DCF2 header.");
-        var name = SanitizeFileName(Encoding.UTF8.GetString(data.Slice(HeaderLength, nameLength)));
-        var type = Encoding.UTF8.GetString(data.Slice(HeaderLength + nameLength, typeLength));
+        var name = SanitizeFileName(Encoding.UTF8.GetString(data, HeaderLength, nameLength));
+        var type = Encoding.UTF8.GetString(data, HeaderLength + nameLength, typeLength);
         if (string.IsNullOrEmpty(type)) type = "application/octet-stream";
-        return new UnpackedFile(name, type, bytes, data.Slice(17, 32).ToArray(), compression, checked((int)transmittedLength));
+        return new UnpackedFile(name, type, bytes, data.AsSpan(17, 32).ToArray(), compression, checked((int)transmittedLength));
     }
 
     public static bool VerifySha256(UnpackedFile file) => CryptographicOperations.FixedTimeEquals(SHA256.HashData(file.Bytes), file.Sha256);
@@ -143,9 +143,9 @@ public static class OpticalFileContainer
         return cleaned is "" or "." or ".." ? "transfer.bin" : cleaned;
     }
 
-    private static ushort ReadUInt16LE(ReadOnlySpan<byte> data, int offset) => (ushort)(data[offset] | (data[offset + 1] << 8));
+    private static ushort ReadUInt16LE(byte[] data, int offset) => (ushort)(data[offset] | (data[offset + 1] << 8));
 
-    private static uint ReadUInt32LE(ReadOnlySpan<byte> data, int offset) => (uint)(data[offset] | (data[offset + 1] << 8) | (data[offset + 2] << 16) | (data[offset + 3] << 24));
+    private static uint ReadUInt32LE(byte[] data, int offset) => (uint)(data[offset] | (data[offset + 1] << 8) | (data[offset + 2] << 16) | (data[offset + 3] << 24));
 
     private static void WriteUInt16LE(byte[] data, int offset, ushort value)
     {
