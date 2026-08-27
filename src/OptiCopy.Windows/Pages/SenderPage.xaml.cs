@@ -30,19 +30,38 @@ public sealed partial class SenderPage : Page
 
     private async void ChooseFile_Click(object sender, RoutedEventArgs e)
     {
-        var picker = new FileOpenPicker();
-        var hwnd = WindowNative.GetWindowHandle(App.MainWindow!);
-        InitializeWithWindow.Initialize(picker, hwnd);
-        picker.FileTypeFilter.Add("*");
-
-        var file = await picker.PickSingleFileAsync();
-        if (file is null) return;
-
         try
         {
-            var buffer = await global::Windows.Storage.FileIO.ReadBufferAsync(file);
-            var payload = buffer.ToArray();
-            _session = OpticalTransferSession.Create(payload, file.Name, "application/octet-stream", CreateSessionId());
+            if (App.MainWindow is null)
+                throw new InvalidOperationException("The OptiCopy window is not initialized.");
+
+            ChooseFileButton.IsEnabled = false;
+            StatusLabel.Text = "OPENING FILE PICKER";
+            EngineStatus.Text = "WAITING";
+
+            var picker = new FileOpenPicker
+            {
+                SuggestedStartLocation = global::Windows.Storage.Pickers.PickerLocationId.DocumentsLibrary,
+                ViewMode = global::Windows.Storage.Pickers.PickerViewMode.List
+            };
+
+            var hwnd = WindowNative.GetWindowHandle(App.MainWindow);
+            InitializeWithWindow.Initialize(picker, hwnd);
+
+            var file = await picker.PickSingleFileAsync();
+            if (file is null)
+            {
+                EngineStatus.Text = "READY";
+                StatusLabel.Text = "NO FILE SELECTED";
+                return;
+            }
+
+            var payload = await File.ReadAllBytesAsync(file.Path);
+            _session = OpticalTransferSession.Create(
+                payload,
+                file.Name,
+                "application/octet-stream",
+                CreateSessionId());
             _framesTarget = Math.Max(_session.MinimumFrames, 1u);
 
             FileNameLabel.Text = file.Name;
@@ -63,7 +82,12 @@ public sealed partial class SenderPage : Page
         catch (Exception ex)
         {
             EngineStatus.Text = "ERROR";
-            StatusLabel.Text = ex.Message;
+            StatusLabel.Text = $"FILE ERROR: {ex.Message}";
+            StartButton.IsEnabled = _session is not null;
+        }
+        finally
+        {
+            ChooseFileButton.IsEnabled = true;
         }
     }
 
@@ -175,6 +199,16 @@ public sealed partial class SenderPage : Page
                 StatusLabel.Text = "CYCLE COMPLETE";
             }
         }
+        catch (Exception ex)
+        {
+            _timer.Stop();
+            _clock.Stop();
+            PauseButton.IsEnabled = false;
+            StopButton.IsEnabled = false;
+            StartButton.IsEnabled = _session is not null;
+            EngineStatus.Text = "ERROR";
+            StatusLabel.Text = $"RENDER ERROR: {ex.Message}";
+        }
         finally
         {
             _renderInProgress = false;
@@ -183,7 +217,11 @@ public sealed partial class SenderPage : Page
 
     private static async Task<SoftwareBitmapSource> CreateBitmapAsync(byte[] pixels, int width, int height)
     {
-        using var bitmap = new SoftwareBitmap(BitmapPixelFormat.Rgba8, width, height, BitmapAlphaMode.Premultiplied);
+        using var bitmap = new SoftwareBitmap(
+            BitmapPixelFormat.Rgba8,
+            width,
+            height,
+            BitmapAlphaMode.Premultiplied);
         bitmap.CopyFromBuffer(pixels.AsBuffer());
 
         var source = new SoftwareBitmapSource();
