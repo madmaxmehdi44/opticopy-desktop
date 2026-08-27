@@ -159,7 +159,7 @@ public sealed partial class SenderPage : Page
         {
             var transferFrame = _session.NextFrame();
             var matrix = QrCodeGenerator.Generate(
-                transferFrame.PayloadBase64,
+                transferFrame.ProtocolPacket,
                 new QrCodeOptions(560, 560, 8, QrErrorCorrection.Medium, true));
 
             var pixels = new byte[checked(matrix.Width * matrix.Height * 4)];
