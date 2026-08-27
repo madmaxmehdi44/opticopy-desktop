@@ -1,5 +1,4 @@
 using System.Linq;
-using System.Text;
 using OptiCopy.Core.Fountain;
 using OptiCopy.Core.Protocol;
 using Xunit;
@@ -75,11 +74,13 @@ public sealed class GoldenVectorInteropTests
     public void CriticalAndIgnorableFlagsMatchDecimenSemantics()
     {
         var critical = FrameCodec.Encode(new Frame(
-            FrameCodec.WireVersion, 0x01, 1, 0, 1, 4, 4, 0, [1, 2, 3, 4]));
+            FrameCodec.WireVersion, 0, 1, 0, 1, 4, 4, 0, [1, 2, 3, 4]));
+        critical[3] = 0x01;
         Assert.Equal(FrameVerdictKind.UnsupportedFlags, FrameCodec.Classify(critical).Kind);
 
         var ignorable = FrameCodec.Encode(new Frame(
-            FrameCodec.WireVersion, 0x10, 1, 0, 1, 4, 4, 0, [1, 2, 3, 4]));
+            FrameCodec.WireVersion, 0, 1, 0, 1, 4, 4, 0, [1, 2, 3, 4]));
+        ignorable[3] = 0x10;
         Assert.Equal(FrameVerdictKind.Ok, FrameCodec.Classify(ignorable).Kind);
         Assert.True(FrameCodec.TryDecode(ignorable, out var decoded));
         Assert.Equal((byte)0x10, decoded.Flags);
