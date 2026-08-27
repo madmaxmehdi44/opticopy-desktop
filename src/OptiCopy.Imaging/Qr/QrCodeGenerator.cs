@@ -23,6 +23,8 @@ public sealed record QrCodeOptions(
 
 public sealed class QrCodeGenerator
 {
+    private readonly QRCodeWriter _writer = new();
+
     public QrMatrix Generate(string content, QrCodeOptions? options = null)
     {
         ArgumentException.ThrowIfNullOrEmpty(content);
@@ -40,8 +42,7 @@ public sealed class QrCodeGenerator
         if (options.DisableEci)
             hints[EncodeHintType.DISABLE_ECI] = true;
 
-        var writer = new QRCodeWriter();
-        var matrix = writer.encode(content, BarcodeFormat.QR_CODE, options.Width, options.Height, hints);
+        var matrix = _writer.encode(content, BarcodeFormat.QR_CODE, options.Width, options.Height, hints);
         var modules = new bool[checked(matrix.Width * matrix.Height)];
         for (var y = 0; y < matrix.Height; y++)
         {
