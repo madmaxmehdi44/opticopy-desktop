@@ -28,7 +28,11 @@ public sealed record OpticalTransferFrame(
 /// </summary>
 public sealed class OpticalTransferSession
 {
-    private readonly CarouselFountainEncoder _encoder;
+    public const int DefaultFrameBytes = 1465;
+    public const int DefaultBlockLength = DefaultFrameBytes - FrameCodec.HeaderLength;
+
+    private readonly byte[] _container;
+    private CarouselFountainEncoder _encoder;
     private uint _nextSequence;
 
     private OpticalTransferSession(
@@ -36,22 +40,22 @@ public sealed class OpticalTransferSession
         OpticalTransferMetadata metadata,
         CarouselFountainEncoder encoder)
     {
-        Container = container;
-        Metadata = metadata;
+        _container = container;
         _encoder = encoder;
+        Metadata = metadata;
     }
 
-    public byte[] Container { get; }
-    public OpticalTransferMetadata Metadata { get; }
+    public byte[] Container => _container;
+    public OpticalTransferMetadata Metadata { get; private set; }
     public uint FramesEmitted { get; private set; }
-    public uint MinimumFrames => checked((uint)Math.Max(1, _encoder.SourceBlocks * 2));
+    public uint CycleLength => checked((uint)Math.Max(1, _encoder.SourceBlocks * 2));
 
     public static async Task<OpticalTransferSession> CreateAsync(
         ReadOnlyMemory<byte> bytes,
         string fileName,
         string mimeType,
         ushort sessionId,
-        int blockLength = 256,
+        int blockLength = DefaultBlockLength,
         CancellationToken cancellationToken = default)
     {
         var packed = await OpticalFileContainer.PackAsync(
@@ -60,24 +64,34 @@ public sealed class OpticalTransferSession
             bytes,
             cancellationToken).ConfigureAwait(false);
 
-        var encoder = new CarouselFountainEncoder(
+        return CreateFromPacked(
             packed.Container,
-            blockLength,
-            sessionId);
-
-        var metadata = new OpticalTransferMetadata(
-            fileName,
-            mimeType,
             packed.OriginalSize,
             packed.TransmittedSize,
             packed.Compression,
             Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(bytes.Span)),
+            fileName,
+            mimeType,
             sessionId,
-            encoder.SourceBlocks,
-            encoder.BlockLength,
-            Fnv1a.Hash(packed.Container));
+            blockLength);
+    }
 
-        return new OpticalTransferSession(packed.Container, metadata, encoder);
+    /// <summary>
+    /// Starts a fresh Decimen stream over the same protected container with a
+    /// new session id, matching the reference sender's start semantics.
+    /// </summary>
+    public OpticalTransferSession Restart(ushort sessionId)
+    {
+        return CreateFromPacked(
+            _container,
+            Metadata.OriginalSize,
+            Metadata.TransmittedSize,
+            Metadata.Compression,
+            Metadata.Sha256,
+            Metadata.FileName,
+            Metadata.MimeType,
+            sessionId,
+            Metadata.BlockLength);
     }
 
     public void Reset()
@@ -97,15 +111,44 @@ public sealed class OpticalTransferSession
             sequence,
             checked((ushort)Metadata.SourceBlocks),
             checked((ushort)Metadata.BlockLength),
-            checked((uint)Container.Length),
+            checked((uint)_container.Length),
             Metadata.PayloadFnv,
             payload);
 
         FramesEmitted++;
-        return new OpticalTransferFrame(
-            sequence,
-            frame,
-            Convert.ToBase64String(FrameCodec.Encode(frame)),
-            string.Empty);
+        var wireBytes = FrameCodec.Encode(frame);
+        var wireBase64 = Convert.ToBase64String(wireBytes);
+        return new OpticalTransferFrame(sequence, frame, wireBase64, wireBase64);
+    }
+
+    private static OpticalTransferSession CreateFromPacked(
+        byte[] container,
+        int originalSize,
+        int transmittedSize,
+        OpticalFileContainer.CompressionMode compression,
+        string sha256,
+        string fileName,
+        string mimeType,
+        ushort sessionId,
+        int blockLength)
+    {
+        ArgumentOutOfRangeException.ThrowIfLessThan(blockLength, 1);
+        ArgumentOutOfRangeException.ThrowIfGreaterThan(blockLength, ushort.MaxValue);
+        ArgumentOutOfRangeException.ThrowIfGreaterThan(container.Length, FrameCodec.MaxFileBytes);
+
+        var encoder = new CarouselFountainEncoder(container, blockLength, sessionId);
+        var metadata = new OpticalTransferMetadata(
+            fileName,
+            mimeType,
+            originalSize,
+            transmittedSize,
+            compression,
+            sha256,
+            sessionId,
+            encoder.SourceBlocks,
+            encoder.BlockLength,
+            Fnv1a.Hash(container));
+
+        return new OpticalTransferSession(container, metadata, encoder);
     }
 }
