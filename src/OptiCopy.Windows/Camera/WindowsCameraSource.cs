@@ -22,7 +22,7 @@ public sealed class WindowsCameraSource : IAsyncDisposable
 
     public event EventHandler<CameraFrame>? FrameArrived;
 
-    public async Task<IReadOnlyList<(string Id, string Name)>> GetCamerasAsync(CancellationToken cancellationToken = default)
+    public static async Task<IReadOnlyList<(string Id, string Name)>> GetCamerasAsync(CancellationToken cancellationToken = default)
     {
         cancellationToken.ThrowIfCancellationRequested();
         var devices = await DeviceInformation.FindAllAsync(DeviceClass.VideoCapture).AsTask(cancellationToken).ConfigureAwait(false);
@@ -35,7 +35,7 @@ public sealed class WindowsCameraSource : IAsyncDisposable
         await _gate.WaitAsync(cancellationToken).ConfigureAwait(false);
         try
         {
-            ThrowIfDisposed();
+            ObjectDisposedException.ThrowIf(_disposed, this);
             await StopCoreAsync().ConfigureAwait(false);
 
             _capture = new MediaCapture();
@@ -146,11 +146,5 @@ public sealed class WindowsCameraSource : IAsyncDisposable
             _gate.Release();
             _gate.Dispose();
         }
-    }
-
-    private void ThrowIfDisposed()
-    {
-        if (_disposed)
-            throw new ObjectDisposedException(nameof(WindowsCameraSource));
     }
 }
