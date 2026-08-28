@@ -32,7 +32,7 @@
                         <RowDefinition Height="Auto" />
                     </Grid.RowDefinitions>
                     <Border Background="#FFFFFF" CornerRadius="14" Padding="12" HorizontalAlignment="Center" VerticalAlignment="Center">
-                        <Image x:Name="QrImage" Width="560" Height="560" Stretch="Uniform" />
+                        <Image x:Name="QrImage" Width="560" Height="560" Stretch="None" HorizontalAlignment="Center" VerticalAlignment="Center" />
                     </Border>
                     <Grid Grid.Row="1" Margin="0,18,0,0">
                         <Grid.ColumnDefinitions>
