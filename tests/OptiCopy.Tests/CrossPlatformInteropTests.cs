@@ -19,7 +19,8 @@ public sealed class CrossPlatformInteropTests
     {
         var root = GetFixtureRoot();
         var path = Path.Combine(root, "ts-to-cs.json");
-        Assert.True(File.Exists(path), $"TypeScript fixture not found: {path}");
+        if (!File.Exists(path))
+            throw new Xunit.Sdk.SkipException($"TypeScript interoperability fixture not found: {path}");
 
         var fixture = JsonSerializer.Deserialize<TsFixture>(await File.ReadAllTextAsync(path));
         Assert.NotNull(fixture);
@@ -87,6 +88,11 @@ public sealed class CrossPlatformInteropTests
         await File.WriteAllTextAsync(Path.Combine(root, "cs-to-ts.json"), JsonSerializer.Serialize(fixture, JsonOptions));
     }
 
-    private static string GetFixtureRoot() => Environment.GetEnvironmentVariable("DECIMEN_FIXTURE_ROOT")
-        ?? throw new InvalidOperationException("DECIMEN_FIXTURE_ROOT must point to the interoperability fixture directory.");
+    private static string? GetFixtureRoot()
+    {
+        var root = Environment.GetEnvironmentVariable("DECIMEN_FIXTURE_ROOT");
+        if (string.IsNullOrWhiteSpace(root))
+            throw new Xunit.Sdk.SkipException("Cross-platform interoperability tests are skipped unless DECIMEN_FIXTURE_ROOT is configured.");
+        return root;
+    }
 }
