@@ -41,7 +41,15 @@ public sealed class OpticalTransferSessionTests
 
         var binary = Convert.FromBase64String(first.PayloadBase64);
         Assert.True(FrameCodec.TryDecode(binary, out var decoded));
-        Assert.Equal(first.Frame, decoded);
+        Assert.Equal(first.Frame.Version, decoded.Version);
+        Assert.Equal(first.Frame.Flags, decoded.Flags);
+        Assert.Equal(first.Frame.SessionId, decoded.SessionId);
+        Assert.Equal(first.Frame.Sequence, decoded.Sequence);
+        Assert.Equal(first.Frame.SourceBlocks, decoded.SourceBlocks);
+        Assert.Equal(first.Frame.BlockLength, decoded.BlockLength);
+        Assert.Equal(first.Frame.TotalLength, decoded.TotalLength);
+        Assert.Equal(first.Frame.PayloadFnv, decoded.PayloadFnv);
+        Assert.Equal(first.Frame.Payload, decoded.Payload);
         Assert.Equal(first.PayloadBase64, first.ProtocolPacket);
         Assert.Equal(OpticalTransferSession.DefaultFrameBytes, binary.Length);
     }
