@@ -11,17 +11,9 @@
 
             <Border Padding="18" Background="{ThemeResource OptiSurfaceBrush}" BorderBrush="{ThemeResource OptiCardBorderBrush}" BorderThickness="1" CornerRadius="14">
                 <StackPanel Spacing="14">
-                    <TextBlock Text="Receiver" FontSize="16" FontWeight="SemiBold" Foreground="{ThemeResource OptiTextPrimaryBrush}" />
-                    <ToggleSwitch x:Name="AutoStartCameraSwitch" Header="Auto-start camera" OffContent="Off" OnContent="On" />
-                    <ToggleSwitch x:Name="RememberLastCameraSwitch" Header="Remember last camera" OffContent="Off" OnContent="On" />
-                </StackPanel>
-            </Border>
-
-            <Border Padding="18" Background="{ThemeResource OptiSurfaceBrush}" BorderBrush="{ThemeResource OptiCardBorderBrush}" BorderThickness="1" CornerRadius="14">
-                <StackPanel Spacing="14">
                     <TextBlock Text="Sender" FontSize="16" FontWeight="SemiBold" Foreground="{ThemeResource OptiTextPrimaryBrush}" />
                     <NumberBox x:Name="TargetFpsBox" Header="Target FPS" Minimum="5" Maximum="60" SmallChange="1" SpinButtonPlacementMode="Compact" />
-                    <TextBlock Text="The sender still obeys protocol framing; this value only controls the UI render cadence." TextWrapping="Wrap" FontSize="12" Foreground="{ThemeResource OptiTextMutedBrush}" />
+                    <TextBlock Text="Controls the sender UI render cadence. The optical wire protocol remains unchanged." TextWrapping="Wrap" FontSize="12" Foreground="{ThemeResource OptiTextMutedBrush}" />
                 </StackPanel>
             </Border>
 
