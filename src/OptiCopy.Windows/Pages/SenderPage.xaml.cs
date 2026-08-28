@@ -14,19 +14,19 @@ namespace OptiCopy.Windows.Pages;
 public sealed partial class SenderPage : Page
 {
     private const int MaxQrDisplayPixels = 560;
+    private const double TargetFps = 24.0;
     private readonly DispatcherTimer _timer;
     private readonly Stopwatch _clock = new();
     private OpticalTransferSession? _session;
-    private uint _framesTarget;
     private bool _renderInProgress;
 
     public SenderPage()
     {
         InitializeComponent();
-        _timer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(125) };
+        _timer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(1000.0 / TargetFps) };
         _timer.Tick += Timer_Tick;
         StartButton.IsEnabled = false;
-        AppLogger.Info("SenderPage initialized.");
+        AppLogger.Info($"SenderPage initialized. TargetFPS={TargetFps:0}.");
     }
 
     private async void ChooseFile_Click(object sender, RoutedEventArgs e)
@@ -62,25 +62,30 @@ public sealed partial class SenderPage : Page
                 return;
             }
 
+            if (string.IsNullOrWhiteSpace(file.Path))
+                throw new IOException("The selected file did not provide a usable local path.");
+
             var payload = await System.IO.File.ReadAllBytesAsync(file.Path);
             AppLogger.Info($"File read succeeded. Bytes={payload.LongLength}.");
 
+            var fileName = System.IO.Path.GetFileName(file.Path);
+            var mimeType = GuessMimeType(fileName);
             _session = await OpticalTransferSession.CreateAsync(
                 payload,
-                System.IO.Path.GetFileName(file.Path),
-                "application/octet-stream",
+                fileName,
+                mimeType,
                 CreateSessionId());
-            AppLogger.Info($"Transfer session created. SourceBlocks={_session.Metadata.SourceBlocks}, BlockLength={_session.Metadata.BlockLength}, MinimumFrames={_session.MinimumFrames}.");
-            _framesTarget = Math.Max(_session.MinimumFrames, 1u);
 
-            FileNameLabel.Text = System.IO.Path.GetFileName(file.Path);
+            AppLogger.Info($"Transfer session created. SourceBlocks={_session.Metadata.SourceBlocks}, BlockLength={_session.Metadata.BlockLength}, CycleLength={_session.CycleLength}, FrameBytes={OpticalTransferSession.DefaultFrameBytes}, MimeType={mimeType}.");
+
+            FileNameLabel.Text = fileName;
             FileSizeLabel.Text = FormatBytes(payload.LongLength);
             HashLabel.Text = $"SHA-256: {_session.Metadata.Sha256}";
             BlocksLabel.Text = _session.Metadata.SourceBlocks.ToString(CultureInfo.InvariantCulture);
             BlockLengthLabel.Text = _session.Metadata.BlockLength.ToString(CultureInfo.InvariantCulture);
-            CycleLabel.Text = _framesTarget.ToString(CultureInfo.InvariantCulture);
+            CycleLabel.Text = _session.CycleLength.ToString(CultureInfo.InvariantCulture);
             FrameLabel.Text = "READY";
-            StreamLabel.Text = "Decimen v3 binary stream ready. Start transmission.";
+            StreamLabel.Text = $"Decimen v3 • {OpticalTransferSession.DefaultFrameBytes:N0}-byte wire frames • {TargetFps:0} fps target";
             EngineStatus.Text = "READY";
             StatusLabel.Text = "READY";
             ProgressBar.Value = 0;
@@ -123,7 +128,9 @@ public sealed partial class SenderPage : Page
     private void Start_Click(object sender, RoutedEventArgs e)
     {
         if (_session is null) return;
-        AppLogger.Info("Transmission start requested.");
+
+        AppLogger.Info("Transmission start requested. Creating a fresh Decimen session id.");
+        _session = _session.Restart(CreateSessionId());
         _session.Reset();
         _clock.Restart();
         _renderInProgress = false;
@@ -147,7 +154,7 @@ public sealed partial class SenderPage : Page
             EngineStatus.Text = "PAUSED";
             StatusLabel.Text = "PAUSED";
         }
-        else
+        else if (_session is not null)
         {
             AppLogger.Info("Transmission resumed.");
             _clock.Start();
@@ -194,8 +201,9 @@ public sealed partial class SenderPage : Page
             var wireBytes = OptiCopy.Core.Protocol.FrameCodec.Encode(transferFrame.Frame);
 
             // Match the Decimen sender's QR path: native module grid first,
-            // then nearest-neighbour integer scaling. Avoid resampling the
-            // QR grid to an arbitrary raster size.
+            // then nearest-neighbour integer scaling. All wire frames have the
+            // same byte length, so the QR geometry remains stable throughout
+            // the carousel.
             var nativeMatrix = new QrCodeGenerator().GenerateNativeBinary(
                 wireBytes,
                 new QrCodeOptions(
@@ -215,28 +223,20 @@ public sealed partial class SenderPage : Page
             QrImage.Height = displaySize;
             QrImage.Source = CreateBitmap(pixels, displaySize, displaySize);
 
-            AppLogger.Info($"Rendered frame {transferFrame.Sequence}. WireBytes={wireBytes.Length}, QRModules={nativeMatrix.Width}, Scale={scale}, Raster={displaySize}x{displaySize}.");
+            var cycleLength = Math.Max(1u, _session.CycleLength);
+            var sequenceInCycle = transferFrame.Sequence % cycleLength;
+            var cycleNumber = transferFrame.Sequence / cycleLength + 1;
+            var progress = (double)(sequenceInCycle + 1) / cycleLength;
+
+            AppLogger.Info($"Rendered frame {transferFrame.Sequence}. Cycle={cycleNumber}, InCycle={sequenceInCycle + 1}/{cycleLength}, WireBytes={wireBytes.Length}, QRModules={nativeMatrix.Width}, Scale={scale}, Raster={displaySize}x{displaySize}.");
             FrameLabel.Text = $"FRAME {transferFrame.Sequence.ToString(CultureInfo.InvariantCulture)}";
-            StreamLabel.Text = $"DECIMEN V3 • {wireBytes.Length.ToString("N0", CultureInfo.InvariantCulture)} bytes • {_session.FramesEmitted.ToString("N0", CultureInfo.InvariantCulture)} frames emitted";
-            var progress = Math.Min(1d, (double)_session.FramesEmitted / _framesTarget);
+            StreamLabel.Text = $"DECIMEN V3 • cycle {cycleNumber.ToString(CultureInfo.InvariantCulture)} • {wireBytes.Length.ToString("N0", CultureInfo.InvariantCulture)} bytes • {TargetFps:0} fps target";
             ProgressBar.Value = progress;
             ProgressLabel.Text = progress.ToString("P0", CultureInfo.InvariantCulture);
 
             var seconds = _clock.Elapsed.TotalSeconds;
             if (seconds > 0)
                 SpeedLabel.Text = $"{(_session.FramesEmitted / seconds).ToString("0.0", CultureInfo.InvariantCulture)} fps";
-
-            if (_session.FramesEmitted >= _framesTarget)
-            {
-                _timer.Stop();
-                _clock.Stop();
-                PauseButton.IsEnabled = false;
-                StopButton.IsEnabled = false;
-                StartButton.IsEnabled = true;
-                PauseButton.Content = "Pause";
-                EngineStatus.Text = "CYCLE COMPLETE";
-                StatusLabel.Text = "CYCLE COMPLETE";
-            }
         }
         catch (Exception ex)
         {
@@ -269,6 +269,43 @@ public sealed partial class SenderPage : Page
     {
         var value = BitConverter.ToUInt16(Guid.NewGuid().ToByteArray(), 0);
         return value == 0 ? (ushort)1 : value;
+    }
+
+    private static string GuessMimeType(string fileName)
+    {
+        var extension = System.IO.Path.GetExtension(fileName).ToLowerInvariant();
+        return extension switch
+        {
+            ".txt" => "text/plain",
+            ".csv" => "text/csv",
+            ".json" => "application/json",
+            ".xml" => "application/xml",
+            ".html" or ".htm" => "text/html",
+            ".pdf" => "application/pdf",
+            ".zip" => "application/zip",
+            ".gz" or ".gzip" => "application/gzip",
+            ".7z" => "application/x-7z-compressed",
+            ".rar" => "application/vnd.rar",
+            ".doc" => "application/msword",
+            ".docx" => "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+            ".xls" => "application/vnd.ms-excel",
+            ".xlsx" => "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            ".ppt" => "application/vnd.ms-powerpoint",
+            ".pptx" => "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+            ".png" => "image/png",
+            ".jpg" or ".jpeg" => "image/jpeg",
+            ".gif" => "image/gif",
+            ".bmp" => "image/bmp",
+            ".webp" => "image/webp",
+            ".svg" => "image/svg+xml",
+            ".wav" => "audio/wav",
+            ".mp3" => "audio/mpeg",
+            ".ogg" => "audio/ogg",
+            ".mp4" => "video/mp4",
+            ".webm" => "video/webm",
+            ".avi" => "video/x-msvideo",
+            _ => "application/octet-stream"
+        };
     }
 
     private static string FormatBytes(long bytes)
