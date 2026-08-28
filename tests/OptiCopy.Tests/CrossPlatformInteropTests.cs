@@ -7,6 +7,8 @@ namespace OptiCopy.Tests;
 
 public sealed class CrossPlatformInteropTests
 {
+    private static readonly JsonSerializerOptions JsonOptions = new() { WriteIndented = true };
+
     private sealed record TsFixture(string Source, string Dcf2, string Frame, FountainFixture Fountain);
     private sealed record FountainFixture(int BlockLength, ushort SessionId, int TotalLength, int K, uint PayloadFnv, string[] Frames);
     private sealed record CsFixture(string Source, string Dcf2, Dictionary<string, string> Frames, CsFountainFixture Fountain);
@@ -80,9 +82,9 @@ public sealed class CrossPlatformInteropTests
             Convert.ToBase64String(source),
             Convert.ToBase64String(packed.Container),
             new Dictionary<string, string> { ["fixed"] = Convert.ToBase64String(FrameCodec.Encode(frame)) },
-            new CsFountainFixture(encoder.BlockLength, encoder.SessionId, encoder.TotalLength, encoder.SourceBlocks, payloadFnv, fountainFrames));
+            new CsFountainFixture(encoder.BlockLength, encoder.SessionId, encoder.TotalLength, encoder.SourceBlocks, payloadFnv, fountainFrames.ToArray()));
 
-        await File.WriteAllTextAsync(Path.Combine(root, "cs-to-ts.json"), JsonSerializer.Serialize(fixture, new JsonSerializerOptions { WriteIndented = true }));
+        await File.WriteAllTextAsync(Path.Combine(root, "cs-to-ts.json"), JsonSerializer.Serialize(fixture, JsonOptions));
     }
 
     private static string GetFixtureRoot() => Environment.GetEnvironmentVariable("DECIMEN_FIXTURE_ROOT")
