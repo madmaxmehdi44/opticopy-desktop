@@ -10,6 +10,10 @@
         </Grid.RowDefinitions>
 
         <Grid>
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="Auto" />
+            </Grid.ColumnDefinitions>
             <StackPanel Spacing="4">
                 <TextBlock Text="TRANSFER HISTORY" FontSize="24" FontWeight="SemiBold" Foreground="{ThemeResource OptiTextPrimaryBrush}" />
                 <TextBlock Text="Local record of optical transfer sessions" Foreground="{ThemeResource OptiTextMutedBrush}" />
