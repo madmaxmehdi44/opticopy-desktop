@@ -11,7 +11,7 @@ internal static class AppLogger
         "OptiCopy",
         "logs");
 
-    private static string LogPath => Path.Combine(DirectoryPath, "opticopy.log");
+    public static string LogFilePath => Path.Combine(DirectoryPath, "opticopy.log");
 
     public static void Info(string message) => Write("INFO", message, null);
 
@@ -38,7 +38,7 @@ internal static class AppLogger
             lock (Gate)
             {
                 Directory.CreateDirectory(DirectoryPath);
-                File.AppendAllText(LogPath, line + Environment.NewLine, Encoding.UTF8);
+                File.AppendAllText(LogFilePath, line + Environment.NewLine, Encoding.UTF8);
             }
 
             Debug.WriteLine(line);
