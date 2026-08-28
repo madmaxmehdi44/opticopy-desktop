@@ -43,8 +43,7 @@ public sealed class QrCodeDecoder
     /// Full QR acquisition with the geometric information needed by the
     /// Decimen-style tracked path. The reference codec returns the complete
     /// perspective quad; ZXing.Net exposes finder result points but not the
-    /// internal detector quad, so we conservatively retain their bounds. This
-    /// is intentionally metadata-only; the normal byte/text result is unchanged.
+    /// internal detector quad, so we conservatively retain their bounds.
     /// </summary>
     public QrPositionedDecodeResult? DecodeWithPosition(
         ReadOnlySpan<byte> pixels,
@@ -114,16 +113,16 @@ public sealed class QrCodeDecoder
                 new QrPoint(0, height));
         }
 
-        var minX = points.Min(static p => p.X);
-        var maxX = points.Max(static p => p.X);
-        var minY = points.Min(static p => p.Y);
-        var maxY = points.Max(static p => p.Y);
+        var minX = points.Min(static p => (double)p.X);
+        var maxX = points.Max(static p => (double)p.X);
+        var minY = points.Min(static p => (double)p.Y);
+        var maxY = points.Max(static p => (double)p.Y);
 
         var pad = Math.Max(2.0, Math.Min(maxX - minX, maxY - minY) * 0.08);
-        minX = Math.Max(0, minX - pad);
-        minY = Math.Max(0, minY - pad);
-        maxX = Math.Min(width, maxX + pad);
-        maxY = Math.Min(height, maxY + pad);
+        minX = Math.Max(0.0, minX - pad);
+        minY = Math.Max(0.0, minY - pad);
+        maxX = Math.Min((double)width, maxX + pad);
+        maxY = Math.Min((double)height, maxY + pad);
 
         return new QrQuad(
             new QrPoint(minX, minY),
@@ -136,8 +135,6 @@ public sealed class QrCodeDecoder
     {
         // ZXing.Net does not expose the sampled module matrix/version through
         // Result. Keep zero as "unknown" rather than inventing a dimension.
-        // QrTrackedDecoder only requires a usable quad for its managed crop
-        // tracking path.
         return 0;
     }
 
