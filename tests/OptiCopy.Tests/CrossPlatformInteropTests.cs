@@ -16,7 +16,12 @@ public sealed class DecimenInteropFactAttribute : FactAttribute
 
 public sealed class CrossPlatformInteropTests
 {
-    private static readonly JsonSerializerOptions JsonOptions = new() { WriteIndented = true };
+    private static readonly JsonSerializerOptions JsonOptions = new()
+    {
+        WriteIndented = true,
+        PropertyNameCaseInsensitive = true,
+        PropertyNamingPolicy = JsonNamingPolicy.CamelCase
+    };
 
     private sealed record TsFixture(string Source, string Dcf2, string Frame, FountainFixture Fountain);
     private sealed record FountainFixture(int BlockLength, ushort SessionId, int TotalLength, int K, uint PayloadFnv, string[] Frames);
@@ -30,7 +35,7 @@ public sealed class CrossPlatformInteropTests
         var path = Path.Combine(root, "ts-to-cs.json");
         Assert.True(File.Exists(path), $"TypeScript fixture not found: {path}");
 
-        var fixture = JsonSerializer.Deserialize<TsFixture>(await File.ReadAllTextAsync(path));
+        var fixture = JsonSerializer.Deserialize<TsFixture>(await File.ReadAllTextAsync(path), JsonOptions);
         Assert.NotNull(fixture);
 
         var source = Convert.FromBase64String(fixture!.Source);

@@ -5,6 +5,11 @@ namespace OptiCopy.Imaging.Qr;
 
 public sealed record QrDecodeResult(string Text, BarcodeFormat Format, int[]? RawBytes = null);
 
+public sealed record QrPositionedDecodeResult(
+    QrDecodeResult Result,
+    QrQuad Quad,
+    int Modules);
+
 public sealed class QrCodeDecoder
 {
     private readonly BarcodeReaderGeneric _reader;
@@ -13,10 +18,6 @@ public sealed class QrCodeDecoder
     {
         _reader = new BarcodeReaderGeneric
         {
-            // Decimen's native codec explicitly disables rotation and inversion.
-            // The optical sender produces upright, non-inverted QR frames; the
-            // fountain layer already provides loss recovery, so avoid expensive
-            // alternate sweeps that are outside the reference pipeline.
             AutoRotate = false,
             Options = new DecodingOptions
             {
@@ -30,7 +31,22 @@ public sealed class QrCodeDecoder
 
     public QrDecodeResult? Decode(ReadOnlySpan<byte> pixels, int width, int height, QrPixelFormat pixelFormat)
     {
-        ArgumentException.ThrowIfNullOrEmpty(pixelFormat.ToString());
+        var positioned = DecodeWithPosition(pixels, width, height, pixelFormat);
+        return positioned?.Result;
+    }
+
+    /// <summary>
+    /// Full QR acquisition with the geometric information needed by the
+    /// Decimen-style tracked path. ZXing.Net exposes finder result points but
+    /// not the exact GridSampler perspective quad used by decimen-codec, so
+    /// the managed path retains a conservative QR region around those points.
+    /// </summary>
+    public QrPositionedDecodeResult? DecodeWithPosition(
+        ReadOnlySpan<byte> pixels,
+        int width,
+        int height,
+        QrPixelFormat pixelFormat)
+    {
         ArgumentOutOfRangeException.ThrowIfNegativeOrZero(width);
         ArgumentOutOfRangeException.ThrowIfNegativeOrZero(height);
 
@@ -47,13 +63,14 @@ public sealed class QrCodeDecoder
         if (pixels.Length < expectedLength)
             throw new ArgumentException("Pixel buffer is shorter than the declared image dimensions.", nameof(pixels));
 
-        var result = _reader.Decode(pixels[..expectedLength].ToArray(), width, height, ToBitmapFormat(pixelFormat));
+        var result = _reader.Decode(
+            pixels[..expectedLength].ToArray(),
+            width,
+            height,
+            ToBitmapFormat(pixelFormat));
         if (result is null)
             return null;
 
-        // ZXing's Result.RawBytes are QR codewords. Decimen carries arbitrary
-        // binary frames in QR BYTE segments, so prefer BYTE_SEGMENTS when the
-        // reader exposes them; this keeps protocol parsing independent of Text.
         var rawBytes = result.RawBytes;
         if (result.ResultMetadata is not null &&
             result.ResultMetadata.TryGetValue(ResultMetadataType.BYTE_SEGMENTS, out var segments) &&
@@ -70,10 +87,55 @@ public sealed class QrCodeDecoder
                 rawBytes = bytes.ToArray();
         }
 
-        return new QrDecodeResult(
+        var decodeResult = new QrDecodeResult(
             result.Text,
             result.BarcodeFormat,
             rawBytes?.Select(static b => (int)b).ToArray());
+
+        return new QrPositionedDecodeResult(
+            decodeResult,
+            BuildQuad(result.ResultPoints, width, height),
+            EstimateModules(result));
+    }
+
+    private static QrQuad BuildQuad(ResultPoint[]? points, int width, int height)
+    {
+        if (points is null || points.Length == 0)
+        {
+            return new QrQuad(
+                new QrPoint(0, 0),
+                new QrPoint(width, 0),
+                new QrPoint(width, height),
+                new QrPoint(0, height));
+        }
+
+        var minX = points.Min(static p => (double)p.X);
+        var maxX = points.Max(static p => (double)p.X);
+        var minY = points.Min(static p => (double)p.Y);
+        var maxY = points.Max(static p => (double)p.Y);
+
+        var span = Math.Max(maxX - minX, maxY - minY);
+        // ResultPoints describe the finder-pattern anchors, not the complete
+        // symbol. A generous margin is therefore required for a cropped
+        // public-ZXing re-detection to retain the whole QR and quiet zone.
+        var pad = Math.Max(12.0, span * 0.25);
+        minX = Math.Max(0.0, minX - pad);
+        minY = Math.Max(0.0, minY - pad);
+        maxX = Math.Min((double)width, maxX + pad);
+        maxY = Math.Min((double)height, maxY + pad);
+
+        return new QrQuad(
+            new QrPoint(minX, minY),
+            new QrPoint(maxX, minY),
+            new QrPoint(maxX, maxY),
+            new QrPoint(minX, maxY));
+    }
+
+    private static int EstimateModules(Result result)
+    {
+        // ZXing.Net does not expose the sampled module matrix/version through
+        // Result. Keep zero as "unknown" rather than inventing a dimension.
+        return 0;
     }
 
     private static RGBLuminanceSource.BitmapFormat ToBitmapFormat(QrPixelFormat pixelFormat) => pixelFormat switch
