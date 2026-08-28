@@ -4,7 +4,7 @@ namespace OptiCopy.Data;
 
 public sealed record AppSettings(bool DarkMode = true);
 
-public sealed class AppSettingsStore
+public sealed class AppSettingsStore : IDisposable
 {
     private static readonly JsonSerializerOptions JsonOptions = new()
     {
@@ -14,6 +14,7 @@ public sealed class AppSettingsStore
 
     private readonly string _path;
     private readonly SemaphoreSlim _gate = new(1, 1);
+    private bool _disposed;
 
     public AppSettingsStore(string? path = null)
     {
@@ -25,6 +26,7 @@ public sealed class AppSettingsStore
 
     public async Task<AppSettings> LoadAsync(CancellationToken cancellationToken = default)
     {
+        ObjectDisposedException.ThrowIf(_disposed, this);
         await _gate.WaitAsync(cancellationToken).ConfigureAwait(false);
         try
         {
@@ -50,6 +52,8 @@ public sealed class AppSettingsStore
 
     public async Task SaveAsync(AppSettings settings, CancellationToken cancellationToken = default)
     {
+        ArgumentNullException.ThrowIfNull(settings);
+        ObjectDisposedException.ThrowIf(_disposed, this);
         await _gate.WaitAsync(cancellationToken).ConfigureAwait(false);
         try
         {
@@ -84,5 +88,13 @@ public sealed class AppSettingsStore
         {
             _gate.Release();
         }
+    }
+
+    public void Dispose()
+    {
+        if (_disposed)
+            return;
+        _disposed = true;
+        _gate.Dispose();
     }
 }
