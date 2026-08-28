@@ -24,15 +24,14 @@ public sealed class OpticalReceiveSessionTests
             .ToArray();
 
         var receiver = new OpticalReceiveSession();
-        ReceiveFrameResult lastResult = ReceiveFrameResult.Foreign;
-        foreach (var frame in frames)
+        var firstWire = FrameCodec.Encode(frames[0].Frame);
+        Assert.Contains(receiver.AcceptFrame(firstWire), new[] { ReceiveFrameResult.Started, ReceiveFrameResult.Accepted, ReceiveFrameResult.Complete });
+        Assert.Equal(ReceiveFrameResult.Duplicate, receiver.AcceptFrame(firstWire));
+
+        ReceiveFrameResult lastResult = ReceiveFrameResult.Accepted;
+        for (var i = 1; i < frames.Length; i++)
         {
-            var wire = Convert.FromBase64String(frame.PayloadBase64);
-            lastResult = receiver.AcceptFrame(wire);
-            if (frame.Sequence == frames[0].Sequence)
-                Assert.Contains(lastResult, new[] { ReceiveFrameResult.Started, ReceiveFrameResult.Accepted, ReceiveFrameResult.Complete });
-            if (frame.Sequence == 0)
-                Assert.Equal(ReceiveFrameResult.Duplicate, receiver.AcceptFrame(wire));
+            lastResult = receiver.AcceptFrame(FrameCodec.Encode(frames[i].Frame));
             if (lastResult == ReceiveFrameResult.Complete)
                 break;
         }
@@ -45,6 +44,7 @@ public sealed class OpticalReceiveSessionTests
         Assert.Equal(Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(payload)).ToLowerInvariant(), receiver.CompletedFile.Sha256);
         Assert.True(receiver.Progress.IsComplete);
         Assert.Equal(1d, receiver.Progress.EstimatedProgress);
+        Assert.True(receiver.Progress.DuplicateFrames >= 1);
     }
 
     [Fact]
@@ -57,34 +57,43 @@ public sealed class OpticalReceiveSessionTests
         var senderB = await OpticalTransferSession.CreateAsync(payloadB, "b.bin", "application/octet-stream", 200);
         var receiver = new OpticalReceiveSession();
 
-        var frameA = senderA.NextFrame();
-        var frameB = senderB.NextFrame();
-        Assert.NotEqual(frameA.Frame.SessionId, frameB.Frame.SessionId);
-
-        var resultA = receiver.AcceptFrame(FrameCodec.Encode(frameA.Frame));
-        var resultB = receiver.AcceptFrame(FrameCodec.Encode(frameB.Frame));
+        var resultA = receiver.AcceptFrame(FrameCodec.Encode(senderA.NextFrame().Frame));
+        var resultB = receiver.AcceptFrame(FrameCodec.Encode(senderB.NextFrame().Frame));
 
         Assert.Equal(ReceiveFrameResult.Started, resultA);
         Assert.Equal(ReceiveFrameResult.Started, resultB);
         Assert.Equal((ushort)200, receiver.Progress.SessionId);
-        Assert.Equal(0, receiver.Progress.NewFrames - 1);
+        Assert.Equal(1, receiver.Progress.NewFrames);
     }
 
     [Fact]
-    public async Task ReceiverRejectsCorruptedCompletedContainerBySha256()
+    public async Task ReceiverReportsHashMismatchForCorruptedSolvedBlock()
     {
         var payload = new byte[12_000];
         new Random(99).NextBytes(payload);
         var sender = await OpticalTransferSession.CreateAsync(payload, "sample.dat", "application/octet-stream", 300);
         var receiver = new OpticalReceiveSession();
 
-        var wires = Enumerable.Range(0, (int)sender.CycleLength)
+        var frames = Enumerable.Range(0, (int)sender.CycleLength)
             .Select(_ => sender.NextFrame())
             .Select(static frame => FrameCodec.Encode(frame.Frame))
             .ToArray();
 
-        var corrupted = wires[0].ToArray();
-        corrupted[^1] ^= 0x5A;
-        Assert.NotEqual(ReceiveFrameResult.Complete, receiver.AcceptFrame(corrupted));
+        var corruptedFirst = frames[0].ToArray();
+        corruptedFirst[^1] ^= 0x5A;
+
+        var result = receiver.AcceptFrame(corruptedFirst);
+        Assert.Contains(result, new[] { ReceiveFrameResult.Started, ReceiveFrameResult.Accepted });
+
+        var final = result;
+        for (var i = 1; i < frames.Length; i++)
+        {
+            final = receiver.AcceptFrame(frames[i]);
+            if (final is ReceiveFrameResult.HashMismatch or ReceiveFrameResult.InvalidContainer or ReceiveFrameResult.Complete)
+                break;
+        }
+
+        Assert.Equal(ReceiveFrameResult.HashMismatch, final);
+        Assert.Null(receiver.CompletedFile);
     }
 }
