@@ -2,30 +2,20 @@
     x:Class="OptiCopy.Windows.Pages.SettingsPage"
     xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
-    <ScrollViewer>
-        <StackPanel Margin="28,22,28,28" Spacing="18">
-            <StackPanel Spacing="4">
-                <TextBlock Text="SETTINGS" FontSize="24" FontWeight="SemiBold" Foreground="{ThemeResource OptiTextPrimaryBrush}" />
-                <TextBlock Text="Persistent local client configuration" Foreground="{ThemeResource OptiTextMutedBrush}" />
-            </StackPanel>
-
-            <Border Padding="18" Background="{ThemeResource OptiSurfaceBrush}" BorderBrush="{ThemeResource OptiCardBorderBrush}" BorderThickness="1" CornerRadius="14">
-                <StackPanel Spacing="14">
-                    <TextBlock Text="Sender" FontSize="16" FontWeight="SemiBold" Foreground="{ThemeResource OptiTextPrimaryBrush}" />
-                    <NumberBox x:Name="TargetFpsBox" Header="Target FPS" Minimum="5" Maximum="60" SmallChange="1" SpinButtonPlacementMode="Compact" />
-                    <TextBlock Text="Controls the sender UI render cadence. The optical wire protocol remains unchanged." TextWrapping="Wrap" FontSize="12" Foreground="{ThemeResource OptiTextMutedBrush}" />
-                </StackPanel>
-            </Border>
-
-            <Border Padding="18" Background="{ThemeResource OptiSurfaceBrush}" BorderBrush="{ThemeResource OptiCardBorderBrush}" BorderThickness="1" CornerRadius="14">
-                <StackPanel Spacing="14">
-                    <TextBlock Text="Appearance" FontSize="16" FontWeight="SemiBold" Foreground="{ThemeResource OptiTextPrimaryBrush}" />
-                    <ToggleSwitch x:Name="DarkModeSwitch" Header="Dark mode" OffContent="Off" OnContent="On" />
-                </StackPanel>
-            </Border>
-
-            <Button x:Name="SaveButton" Content="Save settings" HorizontalAlignment="Left" Click="Save_Click" />
-            <TextBlock x:Name="StatusLabel" Foreground="{ThemeResource OptiTextMutedBrush}" />
+    <StackPanel Margin="28,22,28,28" Spacing="18">
+        <StackPanel Spacing="4">
+            <TextBlock Text="SETTINGS" FontSize="24" FontWeight="SemiBold" Foreground="{ThemeResource OptiTextPrimaryBrush}" />
+            <TextBlock Text="Persistent local client configuration" Foreground="{ThemeResource OptiTextMutedBrush}" />
         </StackPanel>
-    </ScrollViewer>
+
+        <Border Padding="18" Background="{ThemeResource OptiSurfaceBrush}" BorderBrush="{ThemeResource OptiCardBorderBrush}" BorderThickness="1" CornerRadius="14">
+            <StackPanel Spacing="14">
+                <TextBlock Text="Appearance" FontSize="16" FontWeight="SemiBold" Foreground="{ThemeResource OptiTextPrimaryBrush}" />
+                <ToggleSwitch x:Name="DarkModeSwitch" Header="Dark mode" OffContent="Off" OnContent="On" />
+            </StackPanel>
+        </Border>
+
+        <Button x:Name="SaveButton" Content="Save settings" HorizontalAlignment="Left" Click="Save_Click" />
+        <TextBlock x:Name="StatusLabel" Foreground="{ThemeResource OptiTextMutedBrush}" />
+    </StackPanel>
 </Page>
