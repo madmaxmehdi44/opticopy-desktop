@@ -54,10 +54,9 @@ public sealed class WindowsCameraSource : IAsyncDisposable
             if (source is null)
                 throw new InvalidOperationException("The selected camera has no color video frame source.");
 
-            // The Windows App SDK projection exposes the output subtype here as
-            // a string rather than BitmapPixelFormat. ARGB32 is backed by a
-            // SoftwareBitmap that we normalize to BGRA8 below.
-            _reader = await _capture.CreateFrameReaderAsync(source, "ARGB32").AsTask(cancellationToken).ConfigureAwait(false);
+            _reader = await _capture.CreateFrameReaderAsync(source, "ARGB32")
+                .AsTask(cancellationToken)
+                .ConfigureAwait(false);
             _reader.AcquisitionMode = MediaFrameReaderAcquisitionMode.Realtime;
             _reader.FrameArrived += Reader_FrameArrived;
 
@@ -99,7 +98,7 @@ public sealed class WindowsCameraSource : IAsyncDisposable
 
             var width = bgra.PixelWidth;
             var height = bgra.PixelHeight;
-            var buffer = new Windows.Storage.Streams.Buffer(checked((uint)(width * height * 4)));
+            var buffer = new global::Windows.Storage.Streams.Buffer(checked((uint)(width * height * 4)));
             bgra.CopyToBuffer(buffer);
             var pixels = buffer.ToArray();
             FrameArrived?.Invoke(this, new CameraFrame(pixels, width, height));
