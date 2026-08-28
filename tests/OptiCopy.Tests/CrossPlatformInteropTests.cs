@@ -19,7 +19,8 @@ public sealed class CrossPlatformInteropTests
     private static readonly JsonSerializerOptions JsonOptions = new()
     {
         WriteIndented = true,
-        PropertyNameCaseInsensitive = true
+        PropertyNameCaseInsensitive = true,
+        PropertyNamingPolicy = JsonNamingPolicy.CamelCase
     };
 
     private sealed record TsFixture(string Source, string Dcf2, string Frame, FountainFixture Fountain);
