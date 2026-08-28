@@ -3,9 +3,6 @@ using System.Text.Json;
 namespace OptiCopy.Data;
 
 public sealed record AppSettings(
-    bool AutoStartCamera = false,
-    bool RememberLastCamera = true,
-    string PreferredCameraId = "",
     double TargetFps = 24.0,
     bool DarkMode = true);
 
@@ -82,7 +79,7 @@ public sealed class AppSettingsStore
                 }
                 catch
                 {
-                    // Non-fatal cleanup failure.
+                    // Non-fatal cleanup.
                 }
             }
         }
