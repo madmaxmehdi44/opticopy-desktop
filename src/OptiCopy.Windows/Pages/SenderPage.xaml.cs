@@ -18,17 +18,18 @@ public sealed partial class SenderPage : Page
 {
     private const int MaxQrDisplayPixels = 560;
     private const int QuietZoneModules = 4;
-    private const double TargetFps = 24.0;
+    private const double TargetFps = 12.0;
 
     private readonly DispatcherTimer _timer;
     private readonly Stopwatch _clock = new();
     private readonly QrCodeGenerator _qrGenerator = new();
 
-    private OpticalTransferSession? _session;
+    private OpticalTransferSession? _v3Session;
+    private LegacyDot2TransferSession? _session;
     private WriteableBitmap? _qrBitmap;
     private int _qrBitmapWidth;
     private int _qrBitmapHeight;
-    private int? _qrVersion;
+    private int _qrVersion;
     private bool _renderInProgress;
     private Guid? _historyId;
 
@@ -38,7 +39,9 @@ public sealed partial class SenderPage : Page
         _timer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(1000.0 / TargetFps) };
         _timer.Tick += Timer_Tick;
         StartButton.IsEnabled = false;
-        AppLogger.Info($"SenderPage initialized. TargetFPS={TargetFps:0}, FrameBytes={OpticalTransferSession.DefaultFrameBytes}.");
+        PauseButton.IsEnabled = false;
+        StopButton.IsEnabled = false;
+        AppLogger.Info($"SenderPage initialized. LiveProtocol=DOT2, TargetFPS={TargetFps:0}, ChunkBytes={LegacyDot2TransferSession.DefaultChunkSize}.");
     }
 
     private async void ChooseFile_Click(object sender, RoutedEventArgs e)
@@ -51,6 +54,7 @@ public sealed partial class SenderPage : Page
                 _clock.Stop();
                 await FinalizeHistoryAsync(TransferStatus.Cancelled, "Replaced by a new file selection.");
                 _session?.Reset();
+                _v3Session?.Reset();
             }
 
             if (App.MainWindow is null)
@@ -85,30 +89,42 @@ public sealed partial class SenderPage : Page
             if (payload.LongLength == 0)
                 throw new InvalidDataException("The selected file is empty.");
             if (payload.LongLength > OpticalFileContainer.MaxFileBytes)
-                throw new NotSupportedException($"The selected file is {FormatBytes(payload.LongLength)}, but the Decimen format limit is {FormatBytes(OpticalFileContainer.MaxFileBytes)}.");
+                throw new NotSupportedException($"The selected file is {FormatBytes(payload.LongLength)}, but the protocol limit is {FormatBytes(OpticalFileContainer.MaxFileBytes)}.");
 
             var fileName = Path.GetFileName(file.Path);
             var mimeType = GuessMimeType(fileName);
-            _session = await OpticalTransferSession.CreateAsync(
+            var transferId = CreateSessionId();
+
+            // Keep the canonical Decimen v3 session available in Core, but use
+            // the Android-compatible DOT2 stream for the live Windows sender.
+            _v3Session = await OpticalTransferSession.CreateAsync(
                 payload,
                 fileName,
                 mimeType,
-                CreateSessionId());
+                transferId);
+            _session = LegacyDot2TransferSession.Create(
+                payload,
+                fileName,
+                mimeType,
+                transferId,
+                LegacyDot2TransferSession.DefaultChunkSize,
+                LegacyDot2TransferSession.DefaultParityRatio);
 
             FileNameLabel.Text = fileName;
             FileSizeLabel.Text = FormatBytes(payload.LongLength);
             HashLabel.Text = $"SHA-256: {_session.Metadata.Sha256}";
-            BlocksLabel.Text = _session.Metadata.SourceBlocks.ToString(CultureInfo.InvariantCulture);
-            BlockLengthLabel.Text = _session.Metadata.BlockLength.ToString(CultureInfo.InvariantCulture);
+            BlocksLabel.Text = _session.Metadata.DataChunks.ToString(CultureInfo.InvariantCulture);
+            BlockLengthLabel.Text = _session.Metadata.ChunkSize.ToString(CultureInfo.InvariantCulture);
             CycleLabel.Text = _session.CycleLength.ToString(CultureInfo.InvariantCulture);
             FrameLabel.Text = "READY";
-            StreamLabel.Text = $"DECIMEN V3 • {_session.Metadata.BlockLength.ToString("N0", CultureInfo.InvariantCulture)} payload bytes/frame • {TargetFps:0} fps";
+            StreamLabel.Text = $"DOT2 • {_session.Metadata.ChunkSize.ToString("N0", CultureInfo.InvariantCulture)} B/chunk • RS +{(_session.Metadata.ParityChunks / (double)_session.Metadata.DataChunks * 100.0):0}% • {TargetFps:0} fps";
             EngineStatus.Text = "READY";
             StatusLabel.Text = "READY";
             ProgressBar.Value = 0;
             ProgressLabel.Text = "0%";
             SpeedLabel.Text = "— fps";
             ResetQrBitmap();
+            _qrVersion = 0;
             StartButton.IsEnabled = true;
         }
         catch (Exception ex)
@@ -149,12 +165,14 @@ public sealed partial class SenderPage : Page
 
         try
         {
-            AppLogger.Info("Transmission start requested. Creating a fresh Decimen session id.");
-            _session = _session.Restart(CreateSessionId());
+            var restartedId = CreateSessionId();
+            _session = _session.Restart(restartedId);
+            _v3Session = _v3Session?.Restart(restartedId);
             _session.Reset();
+            _v3Session?.Reset();
             _clock.Restart();
             _renderInProgress = false;
-            _qrVersion = null;
+            _qrVersion = 0;
             ResetQrBitmap();
 
             _historyId = Guid.NewGuid();
@@ -167,12 +185,12 @@ public sealed partial class SenderPage : Page
                 _session.Metadata.FileName,
                 _session.Metadata.MimeType,
                 _session.Metadata.OriginalSize,
-                _session.Metadata.TransmittedSize,
+                _session.Metadata.OriginalSize,
                 _session.Metadata.Sha256,
-                _session.Metadata.SessionId,
+                _session.Metadata.TransferId,
                 0,
-                _session.Metadata.SourceBlocks,
-                _session.Metadata.BlockLength,
+                _session.Metadata.DataChunks,
+                _session.Metadata.ChunkSize,
                 null));
 
             RenderFrame();
@@ -221,8 +239,9 @@ public sealed partial class SenderPage : Page
         _clock.Stop();
         await FinalizeHistoryAsync(TransferStatus.Cancelled, null);
         _session?.Reset();
+        _v3Session?.Reset();
         _renderInProgress = false;
-        _qrVersion = null;
+        _qrVersion = 0;
         ResetQrBitmap();
         ProgressBar.Value = 0;
         ProgressLabel.Text = "0%";
@@ -251,13 +270,15 @@ public sealed partial class SenderPage : Page
         try
         {
             var transferFrame = _session.NextFrame();
-            var wireBytes = FrameCodec.Encode(transferFrame.Frame);
+            var packet = transferFrame.Packet;
 
-            if (wireBytes.Length != OpticalTransferSession.DefaultFrameBytes)
-                throw new InvalidDataException($"Unexpected Decimen frame size: {wireBytes.Length} bytes.");
+            if (!packet.StartsWith("DOT2|", StringComparison.Ordinal))
+                throw new InvalidDataException("Live sender produced a non-DOT2 packet.");
 
-            var nativeMatrix = _qrGenerator.GenerateNativeBinary(
-                wireBytes,
+            // DOT2 is the text protocol consumed by the current Android
+            // PacketDecoder. It uses ISO-8859-1-compatible ASCII characters.
+            var matrix = _qrGenerator.Generate(
+                packet,
                 new QrCodeOptions(
                     Width: 0,
                     Height: 0,
@@ -265,37 +286,29 @@ public sealed partial class SenderPage : Page
                     ErrorCorrection: QrErrorCorrection.Low,
                     DisableEci: true,
                     CharacterSet: "ISO-8859-1",
-                    QrVersion: _qrVersion,
+                    QrVersion: null,
                     QrMaskPattern: 4));
 
-            if (_qrVersion is null)
-            {
-                var modules = nativeMatrix.Width;
-                if (modules < 21 || (modules - 17) % 4 != 0)
-                    throw new InvalidOperationException($"Invalid native QR module dimension: {modules}.");
+            if (matrix.Width < 21 || (matrix.Width - 17) % 4 != 0)
+                throw new InvalidOperationException($"Invalid QR module dimension: {matrix.Width}.");
 
-                _qrVersion = (modules - 17) / 4;
-                if (_qrVersion is < 1 or > 40)
-                    throw new InvalidOperationException($"Invalid QR version: {_qrVersion}.");
-            }
-            else if (nativeMatrix.Width != 17 + 4 * _qrVersion.Value)
-            {
-                throw new InvalidOperationException($"QR geometry changed during stream: V{_qrVersion} expected {17 + 4 * _qrVersion.Value} modules, got {nativeMatrix.Width}.");
-            }
+            _qrVersion = (matrix.Width - 17) / 4;
+            if (_qrVersion is < 1 or > 40)
+                throw new InvalidOperationException($"Invalid QR version: {_qrVersion}.");
 
-            var totalModules = checked(nativeMatrix.Width + QuietZoneModules * 2);
+            var totalModules = checked(matrix.Width + QuietZoneModules * 2);
             var scale = Math.Max(1, MaxQrDisplayPixels / totalModules);
             var displaySize = checked(totalModules * scale);
-            var pixels = QrMatrixRasterizer.ToBgra32(nativeMatrix, scale, QuietZoneModules);
+            var pixels = QrMatrixRasterizer.ToBgra32(matrix, scale, QuietZoneModules);
             SetQrBitmap(pixels, displaySize, displaySize);
 
-            var cycleLength = Math.Max(1u, _session.CycleLength);
+            var cycleLength = Math.Max(1, _session.CycleLength);
             var sequenceInCycle = transferFrame.Sequence % cycleLength;
             var cycleNumber = transferFrame.Sequence / cycleLength + 1;
             var progress = (double)(sequenceInCycle + 1) / cycleLength;
 
             FrameLabel.Text = $"FRAME {transferFrame.Sequence.ToString(CultureInfo.InvariantCulture)}";
-            StreamLabel.Text = $"DECIMEN V3 • QR V{_qrVersion} • ECC L • cycle {cycleNumber.ToString(CultureInfo.InvariantCulture)} • {wireBytes.Length.ToString("N0", CultureInfo.InvariantCulture)} bytes • {TargetFps:0} fps target";
+            StreamLabel.Text = $"DOT2 • QR V{_qrVersion} • ECC L • RS +{(_session.Metadata.ParityChunks / (double)_session.Metadata.DataChunks * 100.0):0}% • cycle {cycleNumber.ToString(CultureInfo.InvariantCulture)} • {packet.Length.ToString("N0", CultureInfo.InvariantCulture)} chars • {TargetFps:0} fps";
             ProgressBar.Value = progress;
             ProgressLabel.Text = progress.ToString("P0", CultureInfo.InvariantCulture);
 
@@ -303,7 +316,7 @@ public sealed partial class SenderPage : Page
             if (seconds > 0)
                 SpeedLabel.Text = $"{(_session.FramesEmitted / seconds).ToString("0.0", CultureInfo.InvariantCulture)} fps";
 
-            AppLogger.Info($"Rendered frame {transferFrame.Sequence}. Session={_session.Metadata.SessionId}, Cycle={cycleNumber}, InCycle={sequenceInCycle + 1}/{cycleLength}, WireBytes={wireBytes.Length}, QRVersion={_qrVersion}, Modules={nativeMatrix.Width}, QuietZone={QuietZoneModules}, Scale={scale}, Raster={displaySize}x{displaySize}.");
+            AppLogger.Info($"Rendered DOT2 frame {transferFrame.Sequence}. Transfer={_session.Metadata.TransferId:X4}, Cycle={cycleNumber}, InCycle={sequenceInCycle + 1}/{cycleLength}, PacketChars={packet.Length}, QRVersion={_qrVersion}, Modules={matrix.Width}, QuietZone={QuietZoneModules}, Scale={scale}, Raster={displaySize}x{displaySize}, Parity={transferFrame.IsParity}.");
         }
         catch (Exception ex)
         {
@@ -365,7 +378,7 @@ public sealed partial class SenderPage : Page
                 CompletedAtUtc = DateTimeOffset.UtcNow,
                 Status = status,
                 Frames = _session.FramesEmitted,
-                SessionId = _session.Metadata.SessionId,
+                SessionId = _session.Metadata.TransferId,
                 Error = error
             });
         }
