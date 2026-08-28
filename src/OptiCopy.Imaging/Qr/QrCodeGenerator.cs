@@ -17,13 +17,10 @@ public sealed record QrCodeOptions(
     int Width = 512,
     int Height = 512,
     int QuietZone = 4,
-    // Decimen optical-transfer's QR layer is explicitly L: QR ECC handles
-    // symbol corruption; the fountain layer handles frame loss/erasure.
     QrErrorCorrection ErrorCorrection = QrErrorCorrection.Low,
     bool DisableEci = true,
     string CharacterSet = "UTF-8",
     int? QrVersion = null,
-    // Decimen pins the mask for stable sender geometry and faster generation.
     int QrMaskPattern = 4);
 
 public sealed class QrCodeGenerator
@@ -69,10 +66,10 @@ public sealed class QrCodeGenerator
     }
 
     /// <summary>
-    /// Generates the QR symbol at its native module resolution.
-    /// The caller can then enlarge the resulting raster by an integer factor
-    /// without introducing interpolated module edges. This matches the
-    /// Decimen sender's one-module-per-pixel rasterization before scaling.
+    /// Generates a QR symbol at native module resolution using an explicit
+    /// byte-mode payload. The Decimen stream is arbitrary binary, so the QR
+    /// layer must not allow ZXing's normal mode chooser to reinterpret content
+    /// as numeric/alphanumeric or introduce an encoding segment.
     /// </summary>
     public QrMatrix GenerateNativeBinary(ReadOnlySpan<byte> content, QrCodeOptions? options = null)
     {
@@ -93,6 +90,8 @@ public sealed class QrCodeGenerator
         };
 
         var hints = CreateHints(options);
+        hints[EncodeHintType.QR_COMPACT] = true;
+
         var matrix = _writer.encode(
             Encoding.Latin1.GetString(content),
             BarcodeFormat.QR_CODE,
@@ -133,7 +132,7 @@ public sealed class QrCodeGenerator
             throw new ArgumentOutOfRangeException(nameof(options), "QR version must be between 1 and 40.");
     }
 
-    private static QrMatrix ToMatrix(ZXing.Common.BitMatrix matrix)
+    private static QrMatrix ToMatrix(BitMatrix matrix)
     {
         var modules = new bool[checked(matrix.Width * matrix.Height)];
         for (var y = 0; y < matrix.Height; y++)
