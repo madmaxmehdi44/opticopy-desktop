@@ -13,6 +13,7 @@ namespace OptiCopy.Windows.Pages;
 
 public sealed partial class SenderPage : Page
 {
+    private const int MaxQrDisplayPixels = 560;
     private readonly DispatcherTimer _timer;
     private readonly Stopwatch _clock = new();
     private OpticalTransferSession? _session;
@@ -192,25 +193,29 @@ public sealed partial class SenderPage : Page
             var transferFrame = _session.NextFrame();
             var wireBytes = OptiCopy.Core.Protocol.FrameCodec.Encode(transferFrame.Frame);
 
-            var matrix = new QrCodeGenerator().GenerateBinary(
+            // Match the Decimen sender's QR path: native module grid first,
+            // then nearest-neighbour integer scaling. Avoid resampling the
+            // QR grid to an arbitrary raster size.
+            var nativeMatrix = new QrCodeGenerator().GenerateNativeBinary(
                 wireBytes,
-                new QrCodeOptions(560, 560, 4, QrErrorCorrection.Low, true, "ISO-8859-1"));
+                new QrCodeOptions(
+                    Width: 0,
+                    Height: 0,
+                    QuietZone: 4,
+                    ErrorCorrection: QrErrorCorrection.Low,
+                    DisableEci: true,
+                    CharacterSet: "ISO-8859-1",
+                    QrMaskPattern: 4));
 
-            var pixels = new byte[checked(matrix.Width * matrix.Height * 4)];
-            for (var y = 0; y < matrix.Height; y++)
-            {
-                for (var x = 0; x < matrix.Width; x++)
-                {
-                    var offset = checked((y * matrix.Width + x) * 4);
-                    var value = matrix[x, y] ? (byte)0 : (byte)255;
-                    pixels[offset] = value;
-                    pixels[offset + 1] = value;
-                    pixels[offset + 2] = value;
-                    pixels[offset + 3] = 255;
-                }
-            }
+            var scale = Math.Max(1, MaxQrDisplayPixels / nativeMatrix.Width);
+            var displaySize = checked(nativeMatrix.Width * scale);
+            var pixels = QrMatrixRasterizer.ToGray8(nativeMatrix, scale);
 
-            QrImage.Source = CreateBitmap(pixels, matrix.Width, matrix.Height);
+            QrImage.Width = displaySize;
+            QrImage.Height = displaySize;
+            QrImage.Source = CreateBitmap(pixels, displaySize, displaySize);
+
+            AppLogger.Info($"Rendered frame {transferFrame.Sequence}. WireBytes={wireBytes.Length}, QRModules={nativeMatrix.Width}, Scale={scale}, Raster={displaySize}x{displaySize}.");
             FrameLabel.Text = $"FRAME {transferFrame.Sequence.ToString(CultureInfo.InvariantCulture)}";
             StreamLabel.Text = $"DECIMEN V3 • {wireBytes.Length.ToString("N0", CultureInfo.InvariantCulture)} bytes • {_session.FramesEmitted.ToString("N0", CultureInfo.InvariantCulture)} frames emitted";
             var progress = Math.Min(1d, (double)_session.FramesEmitted / _framesTarget);
