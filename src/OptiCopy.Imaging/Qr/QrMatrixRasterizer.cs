@@ -28,7 +28,7 @@ public static class QrMatrixRasterizer
                 for (var y = 0; y < scale; y++)
                 {
                     var row = checked((startY + y) * width + startX);
-                    pixels.AsSpan(row, scale).Fill(0);
+                    pixels.AsSpan(row, scale).Clear();
                 }
             }
         }
