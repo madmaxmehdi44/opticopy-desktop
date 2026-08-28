@@ -190,9 +190,7 @@ public sealed partial class SenderPage : Page
         try
         {
             var transferFrame = _session.NextFrame();
-            var wireBytes = transferFrame.Frame.Payload is null
-                ? throw new InvalidOperationException("Transfer frame payload is missing.")
-                : OptiCopy.Core.Protocol.FrameCodec.Encode(transferFrame.Frame);
+            var wireBytes = OptiCopy.Core.Protocol.FrameCodec.Encode(transferFrame.Frame);
 
             var matrix = new QrCodeGenerator().GenerateBinary(
                 wireBytes,
@@ -255,7 +253,7 @@ public sealed partial class SenderPage : Page
     private static WriteableBitmap CreateBitmap(byte[] pixels, int width, int height)
     {
         var bitmap = new WriteableBitmap(width, height);
-        using var stream = bitmap.PixelBuffer.AsStream();
+        using var stream = System.Runtime.InteropServices.WindowsRuntime.WindowsRuntimeBufferExtensions.AsStream(bitmap.PixelBuffer);
         stream.Position = 0;
         stream.Write(pixels, 0, pixels.Length);
         bitmap.Invalidate();
