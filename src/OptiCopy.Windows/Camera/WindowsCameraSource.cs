@@ -1,3 +1,4 @@
+using System.Runtime.InteropServices.WindowsRuntime;
 using Windows.Devices.Enumeration;
 using Windows.Graphics.Imaging;
 using Windows.Media.Capture;
@@ -54,9 +55,7 @@ public sealed class WindowsCameraSource : IAsyncDisposable
             if (source is null)
                 throw new InvalidOperationException("The selected camera has no color video frame source.");
 
-            _reader = await _capture.CreateFrameReaderAsync(source, "ARGB32")
-                .AsTask(cancellationToken)
-                .ConfigureAwait(false);
+            _reader = await _capture.CreateFrameReaderAsync(source, "ARGB32").AsTask(cancellationToken).ConfigureAwait(false);
             _reader.AcquisitionMode = MediaFrameReaderAcquisitionMode.Realtime;
             _reader.FrameArrived += Reader_FrameArrived;
 
@@ -100,7 +99,7 @@ public sealed class WindowsCameraSource : IAsyncDisposable
             var height = bgra.PixelHeight;
             var buffer = new global::Windows.Storage.Streams.Buffer(checked((uint)(width * height * 4)));
             bgra.CopyToBuffer(buffer);
-            var pixels = buffer.ToArray();
+            var pixels = global::System.Runtime.InteropServices.WindowsRuntime.WindowsRuntimeBufferExtensions.ToArray(buffer);
             FrameArrived?.Invoke(this, new CameraFrame(pixels, width, height));
         }
         catch
