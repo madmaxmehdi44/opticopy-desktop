@@ -5,6 +5,7 @@ using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Media.Imaging;
 using Microsoft.Windows.Storage.Pickers;
 using OptiCopy.Core.Transfer;
+using OptiCopy.Data;
 using OptiCopy.Imaging.Qr;
 using OptiCopy.Windows.Diagnostics;
 using WinRT.Interop;
@@ -19,6 +20,8 @@ public sealed partial class SenderPage : Page
     private readonly Stopwatch _clock = new();
     private OpticalTransferSession? _session;
     private bool _renderInProgress;
+    private Guid? _historyId;
+    private DateTimeOffset _historyStartedAtUtc;
 
     public SenderPage()
     {
@@ -125,7 +128,7 @@ public sealed partial class SenderPage : Page
         await dialog.ShowAsync();
     }
 
-    private void Start_Click(object sender, RoutedEventArgs e)
+    private async void Start_Click(object sender, RoutedEventArgs e)
     {
         if (_session is null) return;
 
@@ -134,6 +137,33 @@ public sealed partial class SenderPage : Page
         _session.Reset();
         _clock.Restart();
         _renderInProgress = false;
+        _historyId = Guid.NewGuid();
+        _historyStartedAtUtc = DateTimeOffset.UtcNow;
+
+        try
+        {
+            await App.History.AddAsync(new TransferHistoryEntry(
+                _historyId.Value,
+                _historyStartedAtUtc,
+                null,
+                TransferDirection.Send,
+                TransferStatus.Started,
+                _session.Metadata.FileName,
+                _session.Metadata.MimeType,
+                _session.Metadata.OriginalSize,
+                _session.Metadata.TransmittedSize,
+                _session.Metadata.Sha256,
+                _session.Metadata.SessionId,
+                0,
+                _session.Metadata.SourceBlocks,
+                _session.Metadata.BlockLength,
+                null));
+        }
+        catch (Exception ex)
+        {
+            AppLogger.Error("Failed to persist sender history start.", ex);
+        }
+
         RenderFrame();
         _timer.Start();
         StartButton.IsEnabled = false;
@@ -143,7 +173,7 @@ public sealed partial class SenderPage : Page
         StatusLabel.Text = "TRANSMITTING";
     }
 
-    private void Pause_Click(object sender, RoutedEventArgs e)
+    private async void Pause_Click(object sender, RoutedEventArgs e)
     {
         if (_timer.IsEnabled)
         {
@@ -163,13 +193,15 @@ public sealed partial class SenderPage : Page
             EngineStatus.Text = "TRANSMITTING";
             StatusLabel.Text = "TRANSMITTING";
         }
+        await Task.CompletedTask;
     }
 
-    private void Stop_Click(object sender, RoutedEventArgs e)
+    private async void Stop_Click(object sender, RoutedEventArgs e)
     {
         AppLogger.Info("Transmission stop requested.");
         _timer.Stop();
         _clock.Stop();
+        await FinalizeHistoryAsync(TransferStatus.Cancelled, null);
         _session?.Reset();
         _renderInProgress = false;
         ProgressBar.Value = 0;
@@ -200,10 +232,6 @@ public sealed partial class SenderPage : Page
             var transferFrame = _session.NextFrame();
             var wireBytes = OptiCopy.Core.Protocol.FrameCodec.Encode(transferFrame.Frame);
 
-            // Match the Decimen sender's QR path: native module grid first,
-            // then nearest-neighbour integer scaling. All wire frames have the
-            // same byte length, so the QR geometry remains stable throughout
-            // the carousel.
             var nativeMatrix = new QrCodeGenerator().GenerateNativeBinary(
                 wireBytes,
                 new QrCodeOptions(
@@ -248,10 +276,38 @@ public sealed partial class SenderPage : Page
             StartButton.IsEnabled = _session is not null;
             EngineStatus.Text = "ERROR";
             StatusLabel.Text = $"RENDER ERROR: {ex.GetType().Name}: {ex.Message}";
+            _ = FinalizeHistoryAsync(TransferStatus.Failed, ex.Message);
         }
         finally
         {
             _renderInProgress = false;
+        }
+    }
+
+    private async Task FinalizeHistoryAsync(TransferStatus status, string? error)
+    {
+        if (_historyId is not { } id || _session is null)
+            return;
+
+        try
+        {
+            var completedAt = DateTimeOffset.UtcNow;
+            await App.History.UpdateAsync(id, entry => entry with
+            {
+                CompletedAtUtc = completedAt,
+                Status = status,
+                Frames = _session.FramesEmitted,
+                SessionId = _session.Metadata.SessionId,
+                Error = error
+            });
+        }
+        catch (Exception ex)
+        {
+            AppLogger.Error("Failed to finalize sender history.", ex);
+        }
+        finally
+        {
+            _historyId = null;
         }
     }
 
