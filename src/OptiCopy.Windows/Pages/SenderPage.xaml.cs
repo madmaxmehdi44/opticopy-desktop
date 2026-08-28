@@ -15,6 +15,7 @@ namespace OptiCopy.Windows.Pages;
 public sealed partial class SenderPage : Page
 {
     private const int MaxQrDisplayPixels = 560;
+    private const int QuietZoneModules = 4;
     private const double TargetFps = 24.0;
     private readonly DispatcherTimer _timer;
     private readonly Stopwatch _clock = new();
@@ -22,6 +23,7 @@ public sealed partial class SenderPage : Page
     private bool _renderInProgress;
     private Guid? _historyId;
     private DateTimeOffset _historyStartedAtUtc;
+    private int? _qrVersion;
 
     public SenderPage()
     {
@@ -137,6 +139,7 @@ public sealed partial class SenderPage : Page
         _session.Reset();
         _clock.Restart();
         _renderInProgress = false;
+        _qrVersion = null;
         _historyId = Guid.NewGuid();
         _historyStartedAtUtc = DateTimeOffset.UtcNow;
 
@@ -204,6 +207,7 @@ public sealed partial class SenderPage : Page
         await FinalizeHistoryAsync(TransferStatus.Cancelled, null);
         _session?.Reset();
         _renderInProgress = false;
+        _qrVersion = null;
         ProgressBar.Value = 0;
         ProgressLabel.Text = "0%";
         SpeedLabel.Text = "— fps";
@@ -237,15 +241,28 @@ public sealed partial class SenderPage : Page
                 new QrCodeOptions(
                     Width: 0,
                     Height: 0,
-                    QuietZone: 4,
+                    QuietZone: 0,
                     ErrorCorrection: QrErrorCorrection.Low,
                     DisableEci: true,
                     CharacterSet: "ISO-8859-1",
+                    QrVersion: _qrVersion,
                     QrMaskPattern: 4));
 
-            var scale = Math.Max(1, MaxQrDisplayPixels / nativeMatrix.Width);
-            var displaySize = checked(nativeMatrix.Width * scale);
-            var pixels = QrMatrixRasterizer.ToGray8(nativeMatrix, scale);
+            if (_qrVersion is null)
+            {
+                var modules = nativeMatrix.Width;
+                if (modules < 21 || (modules - 17) % 4 != 0)
+                    throw new InvalidOperationException($"Invalid native QR module dimension: {modules}.");
+
+                _qrVersion = (modules - 17) / 4;
+                if (_qrVersion is < 1 or > 40)
+                    throw new InvalidOperationException($"Invalid QR version: {_qrVersion}.");
+            }
+
+            var totalModules = checked(nativeMatrix.Width + QuietZoneModules * 2);
+            var scale = Math.Max(1, MaxQrDisplayPixels / totalModules);
+            var displaySize = checked(totalModules * scale);
+            var pixels = QrMatrixRasterizer.ToGray8(nativeMatrix, scale, QuietZoneModules);
 
             QrImage.Width = displaySize;
             QrImage.Height = displaySize;
@@ -256,9 +273,9 @@ public sealed partial class SenderPage : Page
             var cycleNumber = transferFrame.Sequence / cycleLength + 1;
             var progress = (double)(sequenceInCycle + 1) / cycleLength;
 
-            AppLogger.Info($"Rendered frame {transferFrame.Sequence}. Cycle={cycleNumber}, InCycle={sequenceInCycle + 1}/{cycleLength}, WireBytes={wireBytes.Length}, QRModules={nativeMatrix.Width}, Scale={scale}, Raster={displaySize}x{displaySize}.");
+            AppLogger.Info($"Rendered frame {transferFrame.Sequence}. Cycle={cycleNumber}, InCycle={sequenceInCycle + 1}/{cycleLength}, WireBytes={wireBytes.Length}, QRVersion={_qrVersion}, QRModules={nativeMatrix.Width}, QuietZone={QuietZoneModules}, Scale={scale}, Raster={displaySize}x{displaySize}.");
             FrameLabel.Text = $"FRAME {transferFrame.Sequence.ToString(CultureInfo.InvariantCulture)}";
-            StreamLabel.Text = $"DECIMEN V3 • cycle {cycleNumber.ToString(CultureInfo.InvariantCulture)} • {wireBytes.Length.ToString("N0", CultureInfo.InvariantCulture)} bytes • {TargetFps:0} fps target";
+            StreamLabel.Text = $"DECIMEN V3 • QR V{_qrVersion} • ECC L • cycle {cycleNumber.ToString(CultureInfo.InvariantCulture)} • {wireBytes.Length.ToString("N0", CultureInfo.InvariantCulture)} bytes • {TargetFps:0} fps target";
             ProgressBar.Value = progress;
             ProgressLabel.Text = progress.ToString("P0", CultureInfo.InvariantCulture);
 
