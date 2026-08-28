@@ -17,10 +17,13 @@ public sealed record QrCodeOptions(
     int Width = 512,
     int Height = 512,
     int QuietZone = 4,
-    QrErrorCorrection ErrorCorrection = QrErrorCorrection.Medium,
+    // Decimen optical-transfer's QR layer is explicitly L: QR ECC handles
+    // symbol corruption; the fountain layer handles frame loss/erasure.
+    QrErrorCorrection ErrorCorrection = QrErrorCorrection.Low,
     bool DisableEci = true,
     string CharacterSet = "UTF-8",
     int? QrVersion = null,
+    // Decimen pins the mask for stable sender geometry and faster generation.
     int QrMaskPattern = 4);
 
 public sealed class QrCodeGenerator
@@ -56,9 +59,9 @@ public sealed class QrCodeGenerator
             CharacterSet: "ISO-8859-1",
             DisableEci: true);
 
-        // Decimen's sender uses QR byte mode, ISO-8859-1 semantics for arbitrary
-        // bytes, a 4-module quiet zone, and pins mask pattern 4 for stable
-        // geometry across the stream. Latin-1 is a one-to-one byte->char map.
+        // Decimen frames are arbitrary binary bytes. Use QR byte mode with
+        // ISO-8859-1's one-to-one byte mapping and suppress ECI so the wire
+        // payload is not reinterpreted as UTF-8 text by another implementation.
         options = options with
         {
             CharacterSet = "ISO-8859-1",
