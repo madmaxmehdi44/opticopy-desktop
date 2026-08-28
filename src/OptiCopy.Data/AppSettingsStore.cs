@@ -2,9 +2,7 @@ using System.Text.Json;
 
 namespace OptiCopy.Data;
 
-public sealed record AppSettings(
-    double TargetFps = 24.0,
-    bool DarkMode = true);
+public sealed record AppSettings(bool DarkMode = true);
 
 public sealed class AppSettingsStore
 {
@@ -52,7 +50,6 @@ public sealed class AppSettingsStore
 
     public async Task SaveAsync(AppSettings settings, CancellationToken cancellationToken = default)
     {
-        ArgumentNullException.ThrowIfNull(settings);
         await _gate.WaitAsync(cancellationToken).ConfigureAwait(false);
         try
         {
