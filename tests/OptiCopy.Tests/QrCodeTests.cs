@@ -70,4 +70,22 @@ public sealed class QrCodeTests
         Assert.Contains((byte)0, pixels);
         Assert.Contains((byte)255, pixels);
     }
+
+    [Fact]
+    public void BgraRasterizerProducesWinUiCompatibleBufferWithQuietZone()
+    {
+        var matrix = new QrCodeGenerator().Generate("OptiCopy", new QrCodeOptions(64, 64));
+        const int scale = 2;
+        const int quietZone = 4;
+
+        var pixels = QrMatrixRasterizer.ToBgra32(matrix, scale, quietZone);
+        var width = (matrix.Width + quietZone * 2) * scale;
+        var height = (matrix.Height + quietZone * 2) * scale;
+
+        Assert.Equal(width * height * 4, pixels.Length);
+        Assert.Equal(255, pixels[0]);
+        Assert.Equal(255, pixels[1]);
+        Assert.Equal(255, pixels[2]);
+        Assert.Equal(255, pixels[3]);
+    }
 }
