@@ -13,6 +13,10 @@ public sealed record QrPositionedDecodeResult(
 public sealed class QrCodeDecoder
 {
     private readonly BarcodeReaderGeneric _reader;
+    // ZXing.Net documents PureBarcode as appropriate for synthetic monochrome
+    // symbols. Keep it as a fallback only; the normal detector remains first so
+    // camera frames are still decoded through the ordinary acquisition path.
+    private readonly BarcodeReaderGeneric _pureReader;
 
     public QrCodeDecoder(bool tryHarder = false)
     {
@@ -24,6 +28,19 @@ public sealed class QrCodeDecoder
                 PossibleFormats = [BarcodeFormat.QR_CODE],
                 TryHarder = tryHarder,
                 TryInverted = false,
+                CharacterSet = "UTF-8"
+            }
+        };
+
+        _pureReader = new BarcodeReaderGeneric
+        {
+            AutoRotate = false,
+            Options = new DecodingOptions
+            {
+                PossibleFormats = [BarcodeFormat.QR_CODE],
+                TryHarder = tryHarder,
+                TryInverted = false,
+                PureBarcode = true,
                 CharacterSet = "UTF-8"
             }
         };
@@ -63,11 +80,10 @@ public sealed class QrCodeDecoder
         if (pixels.Length < expectedLength)
             throw new ArgumentException("Pixel buffer is shorter than the declared image dimensions.", nameof(pixels));
 
-        var result = _reader.Decode(
-            pixels[..expectedLength].ToArray(),
-            width,
-            height,
-            ToBitmapFormat(pixelFormat));
+        var rawPixels = pixels[..expectedLength].ToArray();
+        var bitmapFormat = ToBitmapFormat(pixelFormat);
+        var result = _reader.Decode(rawPixels, width, height, bitmapFormat)
+            ?? _pureReader.Decode(rawPixels, width, height, bitmapFormat);
         if (result is null)
             return null;
 
