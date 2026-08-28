@@ -69,8 +69,8 @@ public sealed partial class SenderPage : Page
                 ViewMode = PickerViewMode.List
             };
 
-            var result = await picker.PickSingleFileAsync();
-            if (result is null)
+            var file = await picker.PickSingleFileAsync();
+            if (file is null)
             {
                 EngineStatus.Text = "READY";
                 StatusLabel.Text = "NO FILE SELECTED";
@@ -78,18 +78,16 @@ public sealed partial class SenderPage : Page
                 return;
             }
 
-            var filePath = result.Path;
-            if (string.IsNullOrWhiteSpace(filePath))
+            if (string.IsNullOrWhiteSpace(file.Path))
                 throw new IOException("The selected file did not provide a usable local path.");
 
-            var payload = await File.ReadAllBytesAsync(filePath);
-            if (payload.Length == 0)
+            var payload = await File.ReadAllBytesAsync(file.Path);
+            if (payload.LongLength == 0)
                 throw new InvalidDataException("The selected file is empty.");
             if (payload.LongLength > OpticalFileContainer.MaxFileBytes)
-                throw new NotSupportedException(
-                    $"The selected file is {FormatBytes(payload.LongLength)}, but the Decimen format limit is {FormatBytes(OpticalFileContainer.MaxFileBytes)}.");
+                throw new NotSupportedException($"The selected file is {FormatBytes(payload.LongLength)}, but the Decimen format limit is {FormatBytes(OpticalFileContainer.MaxFileBytes)}.");
 
-            var fileName = Path.GetFileName(filePath);
+            var fileName = Path.GetFileName(file.Path);
             var mimeType = GuessMimeType(fileName);
             _session = await OpticalTransferSession.CreateAsync(
                 payload,
@@ -282,14 +280,13 @@ public sealed partial class SenderPage : Page
             }
             else if (nativeMatrix.Width != 17 + 4 * _qrVersion.Value)
             {
-                throw new InvalidOperationException(
-                    $"QR geometry changed during stream: V{_qrVersion} expected {17 + 4 * _qrVersion.Value} modules, got {nativeMatrix.Width}.");
+                throw new InvalidOperationException($"QR geometry changed during stream: V{_qrVersion} expected {17 + 4 * _qrVersion.Value} modules, got {nativeMatrix.Width}.");
             }
 
             var totalModules = checked(nativeMatrix.Width + QuietZoneModules * 2);
             var scale = Math.Max(1, MaxQrDisplayPixels / totalModules);
             var displaySize = checked(totalModules * scale);
-            var pixels = QrMatrixRasterizer.ToGray8(nativeMatrix, scale, QuietZoneModules);
+            var pixels = QrMatrixRasterizer.ToBgra32(nativeMatrix, scale, QuietZoneModules);
             SetQrBitmap(pixels, displaySize, displaySize);
 
             var cycleLength = Math.Max(1u, _session.CycleLength);
@@ -298,9 +295,7 @@ public sealed partial class SenderPage : Page
             var progress = (double)(sequenceInCycle + 1) / cycleLength;
 
             FrameLabel.Text = $"FRAME {transferFrame.Sequence.ToString(CultureInfo.InvariantCulture)}";
-            StreamLabel.Text =
-                $"DECIMEN V3 • QR V{_qrVersion} • ECC L • cycle {cycleNumber.ToString(CultureInfo.InvariantCulture)} • " +
-                $"{wireBytes.Length.ToString("N0", CultureInfo.InvariantCulture)} bytes • {TargetFps:0} fps target";
+            StreamLabel.Text = $"DECIMEN V3 • QR V{_qrVersion} • ECC L • cycle {cycleNumber.ToString(CultureInfo.InvariantCulture)} • {wireBytes.Length.ToString("N0", CultureInfo.InvariantCulture)} bytes • {TargetFps:0} fps target";
             ProgressBar.Value = progress;
             ProgressLabel.Text = progress.ToString("P0", CultureInfo.InvariantCulture);
 
@@ -308,11 +303,7 @@ public sealed partial class SenderPage : Page
             if (seconds > 0)
                 SpeedLabel.Text = $"{(_session.FramesEmitted / seconds).ToString("0.0", CultureInfo.InvariantCulture)} fps";
 
-            AppLogger.Info(
-                $"Rendered frame {transferFrame.Sequence}. Session={_session.Metadata.SessionId}, " +
-                $"Cycle={cycleNumber}, InCycle={sequenceInCycle + 1}/{cycleLength}, " +
-                $"WireBytes={wireBytes.Length}, QRVersion={_qrVersion}, Modules={nativeMatrix.Width}, " +
-                $"QuietZone={QuietZoneModules}, Scale={scale}, Raster={displaySize}x{displaySize}.");
+            AppLogger.Info($"Rendered frame {transferFrame.Sequence}. Session={_session.Metadata.SessionId}, Cycle={cycleNumber}, InCycle={sequenceInCycle + 1}/{cycleLength}, WireBytes={wireBytes.Length}, QRVersion={_qrVersion}, Modules={nativeMatrix.Width}, QuietZone={QuietZoneModules}, Scale={scale}, Raster={displaySize}x{displaySize}.");
         }
         catch (Exception ex)
         {
@@ -334,6 +325,10 @@ public sealed partial class SenderPage : Page
 
     private void SetQrBitmap(byte[] pixels, int width, int height)
     {
+        var expected = checked(width * height * 4);
+        if (pixels.Length != expected)
+            throw new InvalidDataException($"QR bitmap buffer length mismatch: expected {expected} bytes, got {pixels.Length}.");
+
         if (_qrBitmap is null || _qrBitmapWidth != width || _qrBitmapHeight != height)
         {
             _qrBitmap = new WriteableBitmap(width, height);
