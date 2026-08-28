@@ -69,8 +69,8 @@ public sealed partial class SenderPage : Page
                 ViewMode = PickerViewMode.List
             };
 
-            var file = await picker.PickSingleFileAsync();
-            if (file is null)
+            var result = await picker.PickSingleFileAsync();
+            if (result is null)
             {
                 EngineStatus.Text = "READY";
                 StatusLabel.Text = "NO FILE SELECTED";
@@ -78,19 +78,18 @@ public sealed partial class SenderPage : Page
                 return;
             }
 
-            if (string.IsNullOrWhiteSpace(file.Path))
+            var filePath = result.Path;
+            if (string.IsNullOrWhiteSpace(filePath))
                 throw new IOException("The selected file did not provide a usable local path.");
-            if (file.Size == 0)
+
+            var payload = await File.ReadAllBytesAsync(filePath);
+            if (payload.Length == 0)
                 throw new InvalidDataException("The selected file is empty.");
-            if (file.Size > (ulong)OpticalFileContainer.MaxFileBytes)
-                throw new NotSupportedException($"The selected file is {FormatBytes((long)file.Size)}, but the Decimen format limit is {FormatBytes(OpticalFileContainer.MaxFileBytes)}.");
+            if (payload.LongLength > OpticalFileContainer.MaxFileBytes)
+                throw new NotSupportedException(
+                    $"The selected file is {FormatBytes(payload.LongLength)}, but the Decimen format limit is {FormatBytes(OpticalFileContainer.MaxFileBytes)}.");
 
-            var payload = await File.ReadAllBytesAsync(file.Path);
-            var declaredSize = checked((long)file.Size);
-            if (payload.LongLength != declaredSize)
-                throw new IOException("The file changed while it was being read.");
-
-            var fileName = Path.GetFileName(file.Path);
+            var fileName = Path.GetFileName(filePath);
             var mimeType = GuessMimeType(fileName);
             _session = await OpticalTransferSession.CreateAsync(
                 payload,
@@ -278,6 +277,8 @@ public sealed partial class SenderPage : Page
                     throw new InvalidOperationException($"Invalid native QR module dimension: {modules}.");
 
                 _qrVersion = (modules - 17) / 4;
+                if (_qrVersion is < 1 or > 40)
+                    throw new InvalidOperationException($"Invalid QR version: {_qrVersion}.");
             }
             else if (nativeMatrix.Width != 17 + 4 * _qrVersion.Value)
             {
