@@ -19,4 +19,14 @@ public sealed partial class MainWindow : Window
 
         ContentFrame.Navigate(typeof(SenderPage));
     }
+
+    private void SendNavButton_Click(object sender, RoutedEventArgs e)
+    {
+        ContentFrame.Navigate(typeof(SenderPage));
+    }
+
+    private void ReceiveNavButton_Click(object sender, RoutedEventArgs e)
+    {
+        ContentFrame.Navigate(typeof(ReceiverPage));
+    }
 }
