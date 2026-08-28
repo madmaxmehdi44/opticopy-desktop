@@ -14,6 +14,7 @@
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\..\src\OptiCopy.Core\OptiCopy.Core.csproj" />
+    <ProjectReference Include="..\..\src\OptiCopy.Data\OptiCopy.Data.csproj" />
     <ProjectReference Include="..\..\src\OptiCopy.Imaging\OptiCopy.Imaging.csproj" />
   </ItemGroup>
 </Project>

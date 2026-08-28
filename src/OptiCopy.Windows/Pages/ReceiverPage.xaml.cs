@@ -5,6 +5,7 @@ using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Media.Imaging;
 using Microsoft.Windows.Storage.Pickers;
 using OptiCopy.Core.Transfer;
+using OptiCopy.Data;
 using OptiCopy.Imaging.Qr;
 using OptiCopy.Windows.Camera;
 using OptiCopy.Windows.Diagnostics;
@@ -24,6 +25,9 @@ public sealed partial class ReceiverPage : Page, IAsyncDisposable
     private int _frameBusy;
     private bool _cameraRunning;
     private bool _disposed;
+    private bool _historyRecorded;
+    private Guid? _historyId;
+    private DateTimeOffset _historyStartedAtUtc;
 
     public ReceiverPage()
     {
@@ -81,6 +85,9 @@ public sealed partial class ReceiverPage : Page, IAsyncDisposable
         try
         {
             _receiver.Reset();
+            _historyRecorded = false;
+            _historyId = null;
+            _historyStartedAtUtc = DateTimeOffset.UtcNow;
             SaveButton.IsEnabled = false;
             FileNameLabel.Text = "Waiting for stream";
             FileInfoLabel.Text = "Point the camera at the sender's QR stream.";
@@ -157,6 +164,13 @@ public sealed partial class ReceiverPage : Page, IAsyncDisposable
                         FileNameLabel.Text = received.FileName;
                         FileInfoLabel.Text = $"{received.MimeType} • {received.Bytes.Length:N0} bytes • SHA-256 verified";
                         SaveButton.IsEnabled = true;
+
+                        if (!_historyRecorded)
+                        {
+                            _historyRecorded = true;
+                            _historyId = Guid.NewGuid();
+                            _ = RecordReceiveHistoryAsync(received, progress);
+                        }
                     }
                 });
             }
@@ -183,6 +197,36 @@ public sealed partial class ReceiverPage : Page, IAsyncDisposable
         finally
         {
             Interlocked.Exchange(ref _frameBusy, 0);
+        }
+    }
+
+    private async Task RecordReceiveHistoryAsync(OpticalReceivedFile received, OpticalReceiveProgress progress)
+    {
+        if (_historyId is not { } id)
+            return;
+
+        try
+        {
+            await App.History.AddAsync(new TransferHistoryEntry(
+                id,
+                _historyStartedAtUtc,
+                DateTimeOffset.UtcNow,
+                TransferDirection.Receive,
+                TransferStatus.Completed,
+                received.FileName,
+                received.MimeType,
+                received.OriginalSize,
+                received.TransmittedSize,
+                received.Sha256,
+                received.SessionId,
+                (uint)progress.NewFrames,
+                progress.SourceBlocks,
+                progress.SourceBlocks == 0 ? 0 : progress.TotalLength / progress.SourceBlocks,
+                null));
+        }
+        catch (Exception ex)
+        {
+            AppLogger.Error("Failed to persist receiver history.", ex);
         }
     }
 
