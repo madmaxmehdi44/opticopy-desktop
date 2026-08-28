@@ -3,11 +3,10 @@ using System.Globalization;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Media.Imaging;
+using Microsoft.Windows.Storage.Pickers;
 using OptiCopy.Core.Transfer;
 using OptiCopy.Imaging.Qr;
 using OptiCopy.Windows.Diagnostics;
-using global::System.Runtime.InteropServices.WindowsRuntime;
-using global::Windows.Storage.Pickers;
 using WinRT.Interop;
 
 namespace OptiCopy.Windows.Pages;
@@ -41,41 +40,39 @@ public sealed partial class SenderPage : Page
             StatusLabel.Text = "OPENING FILE PICKER";
             EngineStatus.Text = "WAITING";
 
-            var picker = new FileOpenPicker
-            {
-                SuggestedStartLocation = global::Windows.Storage.Pickers.PickerLocationId.DocumentsLibrary,
-                ViewMode = global::Windows.Storage.Pickers.PickerViewMode.List
-            };
-            picker.FileTypeFilter.Add("*");
-
             var hwnd = WindowNative.GetWindowHandle(App.MainWindow);
-            AppLogger.Info($"Initializing FileOpenPicker. HWND=0x{hwnd.ToInt64():X}.");
-            InitializeWithWindow.Initialize(picker, hwnd);
-            AppLogger.Info("FileOpenPicker initialized.");
+            var windowId = Microsoft.UI.Win32Interop.GetWindowIdFromWindow(hwnd);
+            AppLogger.Info($"Creating Windows App SDK FileOpenPicker. HWND=0x{hwnd.ToInt64():X}, WindowId={windowId.Value}.");
 
+            var picker = new FileOpenPicker(windowId)
+            {
+                SuggestedStartLocation = PickerLocationId.DocumentsLibrary,
+                ViewMode = PickerViewMode.List
+            };
+
+            AppLogger.Info("Calling FileOpenPicker.PickSingleFileAsync().");
             var file = await picker.PickSingleFileAsync();
+            AppLogger.Info(file is null ? "File picker returned no file." : $"File selected. Path='{file.Path}'.");
+
             if (file is null)
             {
-                AppLogger.Info("File picker returned no file.");
                 EngineStatus.Text = "READY";
                 StatusLabel.Text = "NO FILE SELECTED";
                 return;
             }
 
-            var properties = await file.GetBasicPropertiesAsync();
-            AppLogger.Info($"File selected. Name='{file.Name}', Path='{file.Path}', ContentType='{file.ContentType}', Size='{properties.Size}'.");
-            var payload = await File.ReadAllBytesAsync(file.Path);
+            var payload = await System.IO.File.ReadAllBytesAsync(file.Path);
             AppLogger.Info($"File read succeeded. Bytes={payload.LongLength}.");
 
             _session = await OpticalTransferSession.CreateAsync(
                 payload,
-                file.Name,
+                System.IO.Path.GetFileName(file.Path),
                 "application/octet-stream",
                 CreateSessionId());
             AppLogger.Info($"Transfer session created. SourceBlocks={_session.Metadata.SourceBlocks}, BlockLength={_session.Metadata.BlockLength}, MinimumFrames={_session.MinimumFrames}.");
             _framesTarget = Math.Max(_session.MinimumFrames, 1u);
 
-            FileNameLabel.Text = file.Name;
+            FileNameLabel.Text = System.IO.Path.GetFileName(file.Path);
             FileSizeLabel.Text = FormatBytes(payload.LongLength);
             HashLabel.Text = $"SHA-256: {_session.Metadata.Sha256}";
             BlocksLabel.Text = _session.Metadata.SourceBlocks.ToString(CultureInfo.InvariantCulture);
