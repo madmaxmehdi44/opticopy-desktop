@@ -1,13 +1,14 @@
 import { readFileSync, writeFileSync, mkdirSync } from "node:fs";
-import { join } from "node:path";
+import { join, resolve } from "node:path";
+import { pathToFileURL } from "node:url";
 
 const refRoot = process.env.DECIMEN_REF_ROOT;
 const fixtureRoot = process.env.DECIMEN_FIXTURE_ROOT;
 const mode = process.env.DECIMEN_MODE ?? "generate";
 if (!refRoot || !fixtureRoot) throw new Error("DECIMEN_REF_ROOT and DECIMEN_FIXTURE_ROOT are required");
 
-const protocol = await import(new URL(`file://${join(refRoot, "shared/protocol.ts")}`).href);
-const fountain = await import(new URL(`file://${join(refRoot, "shared/fountain.ts")}`).href);
+const protocol = await import(pathToFileURL(resolve(refRoot, "shared/protocol.ts")).href);
+const fountain = await import(pathToFileURL(resolve(refRoot, "shared/fountain.ts")).href);
 mkdirSync(fixtureRoot, { recursive: true });
 
 if (mode === "generate") {
