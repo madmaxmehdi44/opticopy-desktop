@@ -5,6 +5,11 @@ namespace OptiCopy.Imaging.Qr;
 
 public sealed record QrDecodeResult(string Text, BarcodeFormat Format, int[]? RawBytes = null);
 
+public sealed record QrPositionedDecodeResult(
+    QrDecodeResult Result,
+    QrQuad Quad,
+    int Modules);
+
 public sealed class QrCodeDecoder
 {
     private readonly BarcodeReaderGeneric _reader;
@@ -30,7 +35,23 @@ public sealed class QrCodeDecoder
 
     public QrDecodeResult? Decode(ReadOnlySpan<byte> pixels, int width, int height, QrPixelFormat pixelFormat)
     {
-        ArgumentException.ThrowIfNullOrEmpty(pixelFormat.ToString());
+        var positioned = DecodeWithPosition(pixels, width, height, pixelFormat);
+        return positioned?.Result;
+    }
+
+    /// <summary>
+    /// Full QR acquisition with the geometric information needed by the
+    /// Decimen-style tracked path. The reference codec returns the complete
+    /// perspective quad; ZXing.Net exposes finder result points but not the
+    /// internal detector quad, so we conservatively retain their bounds. This
+    /// is intentionally metadata-only; the normal byte/text result is unchanged.
+    /// </summary>
+    public QrPositionedDecodeResult? DecodeWithPosition(
+        ReadOnlySpan<byte> pixels,
+        int width,
+        int height,
+        QrPixelFormat pixelFormat)
+    {
         ArgumentOutOfRangeException.ThrowIfNegativeOrZero(width);
         ArgumentOutOfRangeException.ThrowIfNegativeOrZero(height);
 
@@ -47,13 +68,14 @@ public sealed class QrCodeDecoder
         if (pixels.Length < expectedLength)
             throw new ArgumentException("Pixel buffer is shorter than the declared image dimensions.", nameof(pixels));
 
-        var result = _reader.Decode(pixels[..expectedLength].ToArray(), width, height, ToBitmapFormat(pixelFormat));
+        var result = _reader.Decode(
+            pixels[..expectedLength].ToArray(),
+            width,
+            height,
+            ToBitmapFormat(pixelFormat));
         if (result is null)
             return null;
 
-        // ZXing's Result.RawBytes are QR codewords. Decimen carries arbitrary
-        // binary frames in QR BYTE segments, so prefer BYTE_SEGMENTS when the
-        // reader exposes them; this keeps protocol parsing independent of Text.
         var rawBytes = result.RawBytes;
         if (result.ResultMetadata is not null &&
             result.ResultMetadata.TryGetValue(ResultMetadataType.BYTE_SEGMENTS, out var segments) &&
@@ -70,10 +92,53 @@ public sealed class QrCodeDecoder
                 rawBytes = bytes.ToArray();
         }
 
-        return new QrDecodeResult(
+        var decodeResult = new QrDecodeResult(
             result.Text,
             result.BarcodeFormat,
             rawBytes?.Select(static b => (int)b).ToArray());
+
+        return new QrPositionedDecodeResult(
+            decodeResult,
+            BuildQuad(result.ResultPoints, width, height),
+            EstimateModules(result));
+    }
+
+    private static QrQuad BuildQuad(ResultPoint[]? points, int width, int height)
+    {
+        if (points is null || points.Length == 0)
+        {
+            return new QrQuad(
+                new QrPoint(0, 0),
+                new QrPoint(width, 0),
+                new QrPoint(width, height),
+                new QrPoint(0, height));
+        }
+
+        var minX = points.Min(static p => p.X);
+        var maxX = points.Max(static p => p.X);
+        var minY = points.Min(static p => p.Y);
+        var maxY = points.Max(static p => p.Y);
+
+        var pad = Math.Max(2.0, Math.Min(maxX - minX, maxY - minY) * 0.08);
+        minX = Math.Max(0, minX - pad);
+        minY = Math.Max(0, minY - pad);
+        maxX = Math.Min(width, maxX + pad);
+        maxY = Math.Min(height, maxY + pad);
+
+        return new QrQuad(
+            new QrPoint(minX, minY),
+            new QrPoint(maxX, minY),
+            new QrPoint(maxX, maxY),
+            new QrPoint(minX, maxY));
+    }
+
+    private static int EstimateModules(Result result)
+    {
+        // ZXing.Net does not expose the sampled module matrix/version through
+        // Result. Keep zero as "unknown" rather than inventing a dimension.
+        // QrTrackedDecoder only requires a usable quad for its managed crop
+        // tracking path.
+        return 0;
     }
 
     private static RGBLuminanceSource.BitmapFormat ToBitmapFormat(QrPixelFormat pixelFormat) => pixelFormat switch
