@@ -21,3 +21,43 @@ jobs:
         run: dotnet build OptiCopy.Desktop.sln --configuration Release --no-restore
       - name: Test
         run: dotnet test tests/OptiCopy.Tests/OptiCopy.Tests.csproj --configuration Release --no-build
+
+  cross-platform-interop:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Checkout Decimen TypeScript reference
+        uses: actions/checkout@v4
+        with:
+          repository: bashalarmistalt/decimen-optical-transfer
+          ref: main
+          path: ref/decimen-optical-transfer
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24.x
+          cache: npm
+          cache-dependency-path: ref/decimen-optical-transfer/package-lock.json
+      - name: Install Decimen reference dependencies
+        working-directory: ref/decimen-optical-transfer
+        run: npm ci
+      - name: Generate TypeScript interoperability fixtures
+        env:
+          DECIMEN_REF_ROOT: ${{ github.workspace }}/ref/decimen-optical-transfer
+          DECIMEN_FIXTURE_ROOT: ${{ github.workspace }}/artifacts/interop
+          DECIMEN_MODE: generate
+        run: node --import tsx tests/cross-platform/run-ts-interop.mjs
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+      - name: Run C# interoperability tests and generate C# fixtures
+        env:
+          DECIMEN_FIXTURE_ROOT: ${{ github.workspace }}/artifacts/interop
+        run: dotnet test tests/OptiCopy.Tests/OptiCopy.Tests.csproj --configuration Release
+      - name: TypeScript decodes C# DCF2, frames and fountain stream
+        env:
+          DECIMEN_REF_ROOT: ${{ github.workspace }}/ref/decimen-optical-transfer
+          DECIMEN_FIXTURE_ROOT: ${{ github.workspace }}/artifacts/interop
+          DECIMEN_MODE: verify
+        run: node --import tsx tests/cross-platform/run-ts-interop.mjs
