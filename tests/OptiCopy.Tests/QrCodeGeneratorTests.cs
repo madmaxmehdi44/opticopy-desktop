@@ -14,7 +14,7 @@ public sealed class QrCodeGeneratorTests
         var generator = new QrCodeGenerator();
         var matrix = generator.GenerateNativeBinary(payload, new QrCodeOptions(
             ErrorCorrection: QrErrorCorrection.Low,
-            QuietZone: 4,
+            QuietZone: 0,
             DisableEci: true,
             CharacterSet: "ISO-8859-1",
             QrMaskPattern: 4));
@@ -34,5 +34,23 @@ public sealed class QrCodeGeneratorTests
         Assert.Equal(ZXing.BarcodeFormat.QR_CODE, decoded!.Format);
         Assert.NotNull(decoded.RawBytes);
         Assert.Equal(payload, decoded.RawBytes!.Select(static value => (byte)value).ToArray());
+    }
+
+    [Fact]
+    public void FullDecimenFrameFitsQrVersion27InByteMode()
+    {
+        var frame = new byte[1465];
+        new Random(1337).NextBytes(frame);
+
+        var generator = new QrCodeGenerator();
+        var matrix = generator.GenerateNativeBinary(frame, new QrCodeOptions(
+            ErrorCorrection: QrErrorCorrection.Low,
+            QuietZone: 0,
+            DisableEci: true,
+            CharacterSet: "ISO-8859-1",
+            QrMaskPattern: 4));
+
+        Assert.Equal(27, (matrix.Width - 17) / 4);
+        Assert.Equal(125, matrix.Width);
     }
 }
