@@ -1,5 +1,6 @@
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
+using OptiCopy.Data;
 using OptiCopy.Windows.Diagnostics;
 
 namespace OptiCopy.Windows.Pages;
@@ -17,7 +18,6 @@ public sealed partial class SettingsPage : Page
         try
         {
             var settings = await App.Settings.LoadAsync();
-            TargetFpsBox.Value = settings.TargetFps;
             DarkModeSwitch.IsOn = settings.DarkMode;
             StatusLabel.Text = "Settings loaded.";
         }
@@ -32,12 +32,7 @@ public sealed partial class SettingsPage : Page
     {
         try
         {
-            var fps = TargetFpsBox.Value;
-            if (double.IsNaN(fps) || double.IsInfinity(fps))
-                fps = 24.0;
-            fps = Math.Clamp(fps, 5.0, 60.0);
-
-            var settings = new OptiCopy.Data.AppSettings(fps, DarkModeSwitch.IsOn);
+            var settings = new AppSettings(DarkModeSwitch.IsOn);
             await App.Settings.SaveAsync(settings);
 
             if (App.MainWindow?.Content is FrameworkElement root)
