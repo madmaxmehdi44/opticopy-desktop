@@ -80,13 +80,14 @@ public sealed partial class SenderPage : Page
 
             if (string.IsNullOrWhiteSpace(file.Path))
                 throw new IOException("The selected file did not provide a usable local path.");
-            if (file.Size <= 0)
+            if (file.Size == 0)
                 throw new InvalidDataException("The selected file is empty.");
-            if (file.Size > OpticalFileContainer.MaxFileBytes)
-                throw new NotSupportedException($"The selected file is {FormatBytes(file.Size)}, but the Decimen format limit is {FormatBytes(OpticalFileContainer.MaxFileBytes)}.");
+            if (file.Size > (ulong)OpticalFileContainer.MaxFileBytes)
+                throw new NotSupportedException($"The selected file is {FormatBytes((long)file.Size)}, but the Decimen format limit is {FormatBytes(OpticalFileContainer.MaxFileBytes)}.");
 
             var payload = await File.ReadAllBytesAsync(file.Path);
-            if (payload.LongLength != file.Size)
+            var declaredSize = checked((long)file.Size);
+            if (payload.LongLength != declaredSize)
                 throw new IOException("The file changed while it was being read.");
 
             var fileName = Path.GetFileName(file.Path);
