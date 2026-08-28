@@ -5,6 +5,15 @@ using Xunit;
 
 namespace OptiCopy.Tests;
 
+public sealed class DecimenInteropFactAttribute : FactAttribute
+{
+    public DecimenInteropFactAttribute()
+    {
+        if (string.IsNullOrWhiteSpace(Environment.GetEnvironmentVariable("DECIMEN_FIXTURE_ROOT")))
+            Skip = "Cross-platform interoperability tests require DECIMEN_FIXTURE_ROOT; CI configures it automatically.";
+    }
+}
+
 public sealed class CrossPlatformInteropTests
 {
     private static readonly JsonSerializerOptions JsonOptions = new() { WriteIndented = true };
@@ -14,13 +23,12 @@ public sealed class CrossPlatformInteropTests
     private sealed record CsFixture(string Source, string Dcf2, Dictionary<string, string> Frames, CsFountainFixture Fountain);
     private sealed record CsFountainFixture(int BlockLength, ushort SessionId, int TotalLength, int K, uint PayloadFnv, string[] Frames);
 
-    [Fact]
+    [DecimenInteropFact]
     public async Task CSharpDecodesTypeScriptDcf2FrameAndFountainFixtures()
     {
         var root = GetFixtureRoot();
         var path = Path.Combine(root, "ts-to-cs.json");
-        if (!File.Exists(path))
-            throw new Xunit.Sdk.SkipException($"TypeScript interoperability fixture not found: {path}");
+        Assert.True(File.Exists(path), $"TypeScript fixture not found: {path}");
 
         var fixture = JsonSerializer.Deserialize<TsFixture>(await File.ReadAllTextAsync(path));
         Assert.NotNull(fixture);
@@ -58,7 +66,7 @@ public sealed class CrossPlatformInteropTests
         Assert.Equal(source, recoveredFile.Bytes);
     }
 
-    [Fact]
+    [DecimenInteropFact]
     public async Task CSharpProducesFixturesForTypeScriptDecoder()
     {
         var root = GetFixtureRoot();
@@ -88,11 +96,6 @@ public sealed class CrossPlatformInteropTests
         await File.WriteAllTextAsync(Path.Combine(root, "cs-to-ts.json"), JsonSerializer.Serialize(fixture, JsonOptions));
     }
 
-    private static string? GetFixtureRoot()
-    {
-        var root = Environment.GetEnvironmentVariable("DECIMEN_FIXTURE_ROOT");
-        if (string.IsNullOrWhiteSpace(root))
-            throw new Xunit.Sdk.SkipException("Cross-platform interoperability tests are skipped unless DECIMEN_FIXTURE_ROOT is configured.");
-        return root;
-    }
+    private static string GetFixtureRoot() => Environment.GetEnvironmentVariable("DECIMEN_FIXTURE_ROOT")
+        ?? throw new InvalidOperationException("DECIMEN_FIXTURE_ROOT must be configured.");
 }
