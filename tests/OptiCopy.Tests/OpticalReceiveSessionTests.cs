@@ -50,8 +50,10 @@ public sealed class OpticalReceiveSessionTests
     [Fact]
     public async Task ReceiverResetsAutomaticallyWhenSenderStartsNewSession()
     {
-        var payloadA = Enumerable.Repeat((byte)0x11, 4096).ToArray();
-        var payloadB = Enumerable.Repeat((byte)0xA7, 4096).ToArray();
+        var payloadA = new byte[32_000];
+        var payloadB = new byte[32_000];
+        new Random(100).NextBytes(payloadA);
+        new Random(200).NextBytes(payloadB);
 
         var senderA = await OpticalTransferSession.CreateAsync(payloadA, "a.bin", "application/octet-stream", 100);
         var senderB = await OpticalTransferSession.CreateAsync(payloadB, "b.bin", "application/octet-stream", 200);
