@@ -1,9 +1,11 @@
 using System.Diagnostics;
 using System.Globalization;
+using System.Security.Cryptography;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Media.Imaging;
 using Microsoft.Windows.Storage.Pickers;
+using OptiCopy.Core.Protocol;
 using OptiCopy.Core.Transfer;
 using OptiCopy.Data;
 using OptiCopy.Imaging.Qr;
@@ -17,13 +19,18 @@ public sealed partial class SenderPage : Page
     private const int MaxQrDisplayPixels = 560;
     private const int QuietZoneModules = 4;
     private const double TargetFps = 24.0;
+
     private readonly DispatcherTimer _timer;
     private readonly Stopwatch _clock = new();
+    private readonly QrCodeGenerator _qrGenerator = new();
+
     private OpticalTransferSession? _session;
+    private WriteableBitmap? _qrBitmap;
+    private int _qrBitmapWidth;
+    private int _qrBitmapHeight;
+    private int? _qrVersion;
     private bool _renderInProgress;
     private Guid? _historyId;
-    private DateTimeOffset _historyStartedAtUtc;
-    private int? _qrVersion;
 
     public SenderPage()
     {
@@ -31,57 +38,64 @@ public sealed partial class SenderPage : Page
         _timer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(1000.0 / TargetFps) };
         _timer.Tick += Timer_Tick;
         StartButton.IsEnabled = false;
-        AppLogger.Info($"SenderPage initialized. TargetFPS={TargetFps:0}.");
+        AppLogger.Info($"SenderPage initialized. TargetFPS={TargetFps:0}, FrameBytes={OpticalTransferSession.DefaultFrameBytes}.");
     }
 
     private async void ChooseFile_Click(object sender, RoutedEventArgs e)
     {
         try
         {
-            AppLogger.Info("ChooseFile_Click started.");
+            if (_timer.IsEnabled)
+            {
+                _timer.Stop();
+                _clock.Stop();
+                await FinalizeHistoryAsync(TransferStatus.Cancelled, "Replaced by a new file selection.");
+                _session?.Reset();
+            }
+
             if (App.MainWindow is null)
                 throw new InvalidOperationException("The OptiCopy window is not initialized.");
 
             ChooseFileButton.IsEnabled = false;
+            StartButton.IsEnabled = false;
             StatusLabel.Text = "OPENING FILE PICKER";
             EngineStatus.Text = "WAITING";
 
             var hwnd = WindowNative.GetWindowHandle(App.MainWindow);
             var windowId = Microsoft.UI.Win32Interop.GetWindowIdFromWindow(hwnd);
-            AppLogger.Info($"Creating Windows App SDK FileOpenPicker. HWND=0x{hwnd.ToInt64():X}, WindowId={windowId.Value}.");
-
             var picker = new FileOpenPicker(windowId)
             {
                 SuggestedStartLocation = PickerLocationId.DocumentsLibrary,
                 ViewMode = PickerViewMode.List
             };
 
-            AppLogger.Info("Calling FileOpenPicker.PickSingleFileAsync().");
             var file = await picker.PickSingleFileAsync();
-            AppLogger.Info(file is null ? "File picker returned no file." : $"File selected. Path='{file.Path}'.");
-
             if (file is null)
             {
                 EngineStatus.Text = "READY";
                 StatusLabel.Text = "NO FILE SELECTED";
+                StartButton.IsEnabled = _session is not null;
                 return;
             }
 
             if (string.IsNullOrWhiteSpace(file.Path))
                 throw new IOException("The selected file did not provide a usable local path.");
+            if (file.Size <= 0)
+                throw new InvalidDataException("The selected file is empty.");
+            if (file.Size > OpticalFileContainer.MaxFileBytes)
+                throw new NotSupportedException($"The selected file is {FormatBytes(file.Size)}, but the Decimen format limit is {FormatBytes(OpticalFileContainer.MaxFileBytes)}.");
 
-            var payload = await System.IO.File.ReadAllBytesAsync(file.Path);
-            AppLogger.Info($"File read succeeded. Bytes={payload.LongLength}.");
+            var payload = await File.ReadAllBytesAsync(file.Path);
+            if (payload.LongLength != file.Size)
+                throw new IOException("The file changed while it was being read.");
 
-            var fileName = System.IO.Path.GetFileName(file.Path);
+            var fileName = Path.GetFileName(file.Path);
             var mimeType = GuessMimeType(fileName);
             _session = await OpticalTransferSession.CreateAsync(
                 payload,
                 fileName,
                 mimeType,
                 CreateSessionId());
-
-            AppLogger.Info($"Transfer session created. SourceBlocks={_session.Metadata.SourceBlocks}, BlockLength={_session.Metadata.BlockLength}, CycleLength={_session.CycleLength}, FrameBytes={OpticalTransferSession.DefaultFrameBytes}, MimeType={mimeType}.");
 
             FileNameLabel.Text = fileName;
             FileSizeLabel.Text = FormatBytes(payload.LongLength);
@@ -90,14 +104,14 @@ public sealed partial class SenderPage : Page
             BlockLengthLabel.Text = _session.Metadata.BlockLength.ToString(CultureInfo.InvariantCulture);
             CycleLabel.Text = _session.CycleLength.ToString(CultureInfo.InvariantCulture);
             FrameLabel.Text = "READY";
-            StreamLabel.Text = $"Decimen v3 • {OpticalTransferSession.DefaultFrameBytes:N0}-byte wire frames • {TargetFps:0} fps target";
+            StreamLabel.Text = $"DECIMEN V3 • {_session.Metadata.BlockLength.ToString("N0", CultureInfo.InvariantCulture)} payload bytes/frame • {TargetFps:0} fps";
             EngineStatus.Text = "READY";
             StatusLabel.Text = "READY";
             ProgressBar.Value = 0;
             ProgressLabel.Text = "0%";
             SpeedLabel.Text = "— fps";
+            ResetQrBitmap();
             StartButton.IsEnabled = true;
-            AppLogger.Info("ChooseFile_Click completed successfully.");
         }
         catch (Exception ex)
         {
@@ -132,22 +146,23 @@ public sealed partial class SenderPage : Page
 
     private async void Start_Click(object sender, RoutedEventArgs e)
     {
-        if (_session is null) return;
-
-        AppLogger.Info("Transmission start requested. Creating a fresh Decimen session id.");
-        _session = _session.Restart(CreateSessionId());
-        _session.Reset();
-        _clock.Restart();
-        _renderInProgress = false;
-        _qrVersion = null;
-        _historyId = Guid.NewGuid();
-        _historyStartedAtUtc = DateTimeOffset.UtcNow;
+        if (_session is null)
+            return;
 
         try
         {
+            AppLogger.Info("Transmission start requested. Creating a fresh Decimen session id.");
+            _session = _session.Restart(CreateSessionId());
+            _session.Reset();
+            _clock.Restart();
+            _renderInProgress = false;
+            _qrVersion = null;
+            ResetQrBitmap();
+
+            _historyId = Guid.NewGuid();
             await App.History.AddAsync(new TransferHistoryEntry(
                 _historyId.Value,
-                _historyStartedAtUtc,
+                DateTimeOffset.UtcNow,
                 null,
                 TransferDirection.Send,
                 TransferStatus.Started,
@@ -161,26 +176,31 @@ public sealed partial class SenderPage : Page
                 _session.Metadata.SourceBlocks,
                 _session.Metadata.BlockLength,
                 null));
+
+            RenderFrame();
+            _timer.Start();
+            StartButton.IsEnabled = false;
+            PauseButton.IsEnabled = true;
+            StopButton.IsEnabled = true;
+            EngineStatus.Text = "TRANSMITTING";
+            StatusLabel.Text = "TRANSMITTING";
         }
         catch (Exception ex)
         {
-            AppLogger.Error("Failed to persist sender history start.", ex);
+            AppLogger.Error("Start_Click failed.", ex);
+            _timer.Stop();
+            _clock.Stop();
+            await FinalizeHistoryAsync(TransferStatus.Failed, ex.Message);
+            EngineStatus.Text = "ERROR";
+            StatusLabel.Text = $"START ERROR: {ex.GetType().Name}: {ex.Message}";
+            StartButton.IsEnabled = _session is not null;
         }
-
-        RenderFrame();
-        _timer.Start();
-        StartButton.IsEnabled = false;
-        PauseButton.IsEnabled = true;
-        StopButton.IsEnabled = true;
-        EngineStatus.Text = "TRANSMITTING";
-        StatusLabel.Text = "TRANSMITTING";
     }
 
-    private async void Pause_Click(object sender, RoutedEventArgs e)
+    private void Pause_Click(object sender, RoutedEventArgs e)
     {
         if (_timer.IsEnabled)
         {
-            AppLogger.Info("Transmission paused.");
             _timer.Stop();
             _clock.Stop();
             PauseButton.Content = "Resume";
@@ -189,25 +209,23 @@ public sealed partial class SenderPage : Page
         }
         else if (_session is not null)
         {
-            AppLogger.Info("Transmission resumed.");
             _clock.Start();
             _timer.Start();
             PauseButton.Content = "Pause";
             EngineStatus.Text = "TRANSMITTING";
             StatusLabel.Text = "TRANSMITTING";
         }
-        await Task.CompletedTask;
     }
 
     private async void Stop_Click(object sender, RoutedEventArgs e)
     {
-        AppLogger.Info("Transmission stop requested.");
         _timer.Stop();
         _clock.Stop();
         await FinalizeHistoryAsync(TransferStatus.Cancelled, null);
         _session?.Reset();
         _renderInProgress = false;
         _qrVersion = null;
+        ResetQrBitmap();
         ProgressBar.Value = 0;
         ProgressLabel.Text = "0%";
         SpeedLabel.Text = "— fps";
@@ -222,21 +240,25 @@ public sealed partial class SenderPage : Page
 
     private void Timer_Tick(object? sender, object e)
     {
-        if (_renderInProgress) return;
-        RenderFrame();
+        if (!_renderInProgress)
+            RenderFrame();
     }
 
     private void RenderFrame()
     {
-        if (_session is null || _renderInProgress) return;
-        _renderInProgress = true;
+        if (_session is null || _renderInProgress)
+            return;
 
+        _renderInProgress = true;
         try
         {
             var transferFrame = _session.NextFrame();
-            var wireBytes = OptiCopy.Core.Protocol.FrameCodec.Encode(transferFrame.Frame);
+            var wireBytes = FrameCodec.Encode(transferFrame.Frame);
 
-            var nativeMatrix = new QrCodeGenerator().GenerateNativeBinary(
+            if (wireBytes.Length != OpticalTransferSession.DefaultFrameBytes)
+                throw new InvalidDataException($"Unexpected Decimen frame size: {wireBytes.Length} bytes.");
+
+            var nativeMatrix = _qrGenerator.GenerateNativeBinary(
                 wireBytes,
                 new QrCodeOptions(
                     Width: 0,
@@ -255,33 +277,40 @@ public sealed partial class SenderPage : Page
                     throw new InvalidOperationException($"Invalid native QR module dimension: {modules}.");
 
                 _qrVersion = (modules - 17) / 4;
-                if (_qrVersion is < 1 or > 40)
-                    throw new InvalidOperationException($"Invalid QR version: {_qrVersion}.");
+            }
+            else if (nativeMatrix.Width != 17 + 4 * _qrVersion.Value)
+            {
+                throw new InvalidOperationException(
+                    $"QR geometry changed during stream: V{_qrVersion} expected {17 + 4 * _qrVersion.Value} modules, got {nativeMatrix.Width}.");
             }
 
             var totalModules = checked(nativeMatrix.Width + QuietZoneModules * 2);
             var scale = Math.Max(1, MaxQrDisplayPixels / totalModules);
             var displaySize = checked(totalModules * scale);
             var pixels = QrMatrixRasterizer.ToGray8(nativeMatrix, scale, QuietZoneModules);
-
-            QrImage.Width = displaySize;
-            QrImage.Height = displaySize;
-            QrImage.Source = CreateBitmap(pixels, displaySize, displaySize);
+            SetQrBitmap(pixels, displaySize, displaySize);
 
             var cycleLength = Math.Max(1u, _session.CycleLength);
             var sequenceInCycle = transferFrame.Sequence % cycleLength;
             var cycleNumber = transferFrame.Sequence / cycleLength + 1;
             var progress = (double)(sequenceInCycle + 1) / cycleLength;
 
-            AppLogger.Info($"Rendered frame {transferFrame.Sequence}. Cycle={cycleNumber}, InCycle={sequenceInCycle + 1}/{cycleLength}, WireBytes={wireBytes.Length}, QRVersion={_qrVersion}, QRModules={nativeMatrix.Width}, QuietZone={QuietZoneModules}, Scale={scale}, Raster={displaySize}x{displaySize}.");
             FrameLabel.Text = $"FRAME {transferFrame.Sequence.ToString(CultureInfo.InvariantCulture)}";
-            StreamLabel.Text = $"DECIMEN V3 • QR V{_qrVersion} • ECC L • cycle {cycleNumber.ToString(CultureInfo.InvariantCulture)} • {wireBytes.Length.ToString("N0", CultureInfo.InvariantCulture)} bytes • {TargetFps:0} fps target";
+            StreamLabel.Text =
+                $"DECIMEN V3 • QR V{_qrVersion} • ECC L • cycle {cycleNumber.ToString(CultureInfo.InvariantCulture)} • " +
+                $"{wireBytes.Length.ToString("N0", CultureInfo.InvariantCulture)} bytes • {TargetFps:0} fps target";
             ProgressBar.Value = progress;
             ProgressLabel.Text = progress.ToString("P0", CultureInfo.InvariantCulture);
 
             var seconds = _clock.Elapsed.TotalSeconds;
             if (seconds > 0)
                 SpeedLabel.Text = $"{(_session.FramesEmitted / seconds).ToString("0.0", CultureInfo.InvariantCulture)} fps";
+
+            AppLogger.Info(
+                $"Rendered frame {transferFrame.Sequence}. Session={_session.Metadata.SessionId}, " +
+                $"Cycle={cycleNumber}, InCycle={sequenceInCycle + 1}/{cycleLength}, " +
+                $"WireBytes={wireBytes.Length}, QRVersion={_qrVersion}, Modules={nativeMatrix.Width}, " +
+                $"QuietZone={QuietZoneModules}, Scale={scale}, Raster={displaySize}x{displaySize}.");
         }
         catch (Exception ex)
         {
@@ -301,6 +330,32 @@ public sealed partial class SenderPage : Page
         }
     }
 
+    private void SetQrBitmap(byte[] pixels, int width, int height)
+    {
+        if (_qrBitmap is null || _qrBitmapWidth != width || _qrBitmapHeight != height)
+        {
+            _qrBitmap = new WriteableBitmap(width, height);
+            _qrBitmapWidth = width;
+            _qrBitmapHeight = height;
+            QrImage.Width = width;
+            QrImage.Height = height;
+            QrImage.Source = _qrBitmap;
+        }
+
+        using var stream = System.Runtime.InteropServices.WindowsRuntime.WindowsRuntimeBufferExtensions.AsStream(_qrBitmap.PixelBuffer);
+        stream.Position = 0;
+        stream.Write(pixels, 0, pixels.Length);
+        _qrBitmap.Invalidate();
+    }
+
+    private void ResetQrBitmap()
+    {
+        _qrBitmap = null;
+        _qrBitmapWidth = 0;
+        _qrBitmapHeight = 0;
+        QrImage.Source = null;
+    }
+
     private async Task FinalizeHistoryAsync(TransferStatus status, string? error)
     {
         if (_historyId is not { } id || _session is null)
@@ -308,10 +363,9 @@ public sealed partial class SenderPage : Page
 
         try
         {
-            var completedAt = DateTimeOffset.UtcNow;
             await App.History.UpdateAsync(id, entry => entry with
             {
-                CompletedAtUtc = completedAt,
+                CompletedAtUtc = DateTimeOffset.UtcNow,
                 Status = status,
                 Frames = _session.FramesEmitted,
                 SessionId = _session.Metadata.SessionId,
@@ -328,25 +382,14 @@ public sealed partial class SenderPage : Page
         }
     }
 
-    private static WriteableBitmap CreateBitmap(byte[] pixels, int width, int height)
-    {
-        var bitmap = new WriteableBitmap(width, height);
-        using var stream = System.Runtime.InteropServices.WindowsRuntime.WindowsRuntimeBufferExtensions.AsStream(bitmap.PixelBuffer);
-        stream.Position = 0;
-        stream.Write(pixels, 0, pixels.Length);
-        bitmap.Invalidate();
-        return bitmap;
-    }
-
     private static ushort CreateSessionId()
     {
-        var value = BitConverter.ToUInt16(Guid.NewGuid().ToByteArray(), 0);
-        return value == 0 ? (ushort)1 : value;
+        return checked((ushort)RandomNumberGenerator.GetInt32(1, ushort.MaxValue + 1));
     }
 
     private static string GuessMimeType(string fileName)
     {
-        var extension = System.IO.Path.GetExtension(fileName).ToLowerInvariant();
+        var extension = Path.GetExtension(fileName).ToLowerInvariant();
         return extension switch
         {
             ".txt" => "text/plain",
