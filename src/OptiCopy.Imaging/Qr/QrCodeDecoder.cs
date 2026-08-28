@@ -18,10 +18,6 @@ public sealed class QrCodeDecoder
     {
         _reader = new BarcodeReaderGeneric
         {
-            // Decimen's native codec explicitly disables rotation and inversion.
-            // The optical sender produces upright, non-inverted QR frames; the
-            // fountain layer already provides loss recovery, so avoid expensive
-            // alternate sweeps that are outside the reference pipeline.
             AutoRotate = false,
             Options = new DecodingOptions
             {
@@ -41,9 +37,9 @@ public sealed class QrCodeDecoder
 
     /// <summary>
     /// Full QR acquisition with the geometric information needed by the
-    /// Decimen-style tracked path. The reference codec returns the complete
-    /// perspective quad; ZXing.Net exposes finder result points but not the
-    /// internal detector quad, so we conservatively retain their bounds.
+    /// Decimen-style tracked path. ZXing.Net exposes finder result points but
+    /// not the exact GridSampler perspective quad used by decimen-codec, so
+    /// the managed path retains a conservative QR region around those points.
     /// </summary>
     public QrPositionedDecodeResult? DecodeWithPosition(
         ReadOnlySpan<byte> pixels,
@@ -118,7 +114,11 @@ public sealed class QrCodeDecoder
         var minY = points.Min(static p => (double)p.Y);
         var maxY = points.Max(static p => (double)p.Y);
 
-        var pad = Math.Max(2.0, Math.Min(maxX - minX, maxY - minY) * 0.08);
+        var span = Math.Max(maxX - minX, maxY - minY);
+        // ResultPoints describe the finder-pattern anchors, not the complete
+        // symbol. A generous margin is therefore required for a cropped
+        // public-ZXing re-detection to retain the whole QR and quiet zone.
+        var pad = Math.Max(12.0, span * 0.25);
         minX = Math.Max(0.0, minX - pad);
         minY = Math.Max(0.0, minY - pad);
         maxX = Math.Min((double)width, maxX + pad);
