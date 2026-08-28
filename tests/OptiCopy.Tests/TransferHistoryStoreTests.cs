@@ -6,7 +6,7 @@ namespace OptiCopy.Tests;
 public sealed class TransferHistoryStoreTests
 {
     [Fact]
-    public async Task AddAndGet_PreservesNewestFirstOrder()
+    public async Task AddAndGetPreservesNewestFirstOrder()
     {
         var path = Path.Combine(Path.GetTempPath(), $"opticopy-history-{Guid.NewGuid():N}.json");
         try
@@ -30,7 +30,7 @@ public sealed class TransferHistoryStoreTests
     }
 
     [Fact]
-    public async Task Update_ChangesOnlyRequestedEntry()
+    public async Task UpdateChangesOnlyRequestedEntry()
     {
         var path = Path.Combine(Path.GetTempPath(), $"opticopy-history-{Guid.NewGuid():N}.json");
         try
@@ -58,7 +58,7 @@ public sealed class TransferHistoryStoreTests
     }
 
     [Fact]
-    public async Task Clear_RemovesAllEntries()
+    public async Task ClearRemovesAllEntries()
     {
         var path = Path.Combine(Path.GetTempPath(), $"opticopy-history-{Guid.NewGuid():N}.json");
         try
