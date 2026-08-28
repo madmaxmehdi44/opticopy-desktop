@@ -9,16 +9,20 @@ public sealed class QrCodeDecoder
 {
     private readonly BarcodeReaderGeneric _reader;
 
-    public QrCodeDecoder()
+    public QrCodeDecoder(bool tryHarder = false)
     {
         _reader = new BarcodeReaderGeneric
         {
+            // Decimen's native codec explicitly disables rotation and inversion.
+            // The optical sender produces upright, non-inverted QR frames; the
+            // fountain layer already provides loss recovery, so avoid expensive
+            // alternate sweeps that are outside the reference pipeline.
             AutoRotate = false,
             Options = new DecodingOptions
             {
                 PossibleFormats = [BarcodeFormat.QR_CODE],
-                TryHarder = false,
-                TryInverted = true,
+                TryHarder = tryHarder,
+                TryInverted = false,
                 CharacterSet = "UTF-8"
             }
         };
@@ -47,9 +51,9 @@ public sealed class QrCodeDecoder
         if (result is null)
             return null;
 
-        // ZXing's Result.RawBytes are the QR code's raw codewords, not the
-        // decoded byte-mode payload. Decimen frames are deliberately binary,
-        // so expose BYTE_SEGMENTS as RawBytes when available.
+        // ZXing's Result.RawBytes are QR codewords. Decimen carries arbitrary
+        // binary frames in QR BYTE segments, so prefer BYTE_SEGMENTS when the
+        // reader exposes them; this keeps protocol parsing independent of Text.
         var rawBytes = result.RawBytes;
         if (result.ResultMetadata is not null &&
             result.ResultMetadata.TryGetValue(ResultMetadataType.BYTE_SEGMENTS, out var segments) &&
