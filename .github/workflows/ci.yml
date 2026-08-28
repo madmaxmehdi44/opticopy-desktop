@@ -42,11 +42,12 @@ jobs:
         working-directory: ref/decimen-optical-transfer
         run: npm ci
       - name: Generate TypeScript interoperability fixtures
+        working-directory: ref/decimen-optical-transfer
         env:
           DECIMEN_REF_ROOT: ${{ github.workspace }}/ref/decimen-optical-transfer
           DECIMEN_FIXTURE_ROOT: ${{ github.workspace }}/artifacts/interop
           DECIMEN_MODE: generate
-        run: node --import tsx tests/cross-platform/run-ts-interop.mjs
+        run: node --import tsx ../../tests/cross-platform/run-ts-interop.mjs
       - name: Setup .NET
         uses: actions/setup-dotnet@v4
         with:
@@ -56,8 +57,9 @@ jobs:
           DECIMEN_FIXTURE_ROOT: ${{ github.workspace }}/artifacts/interop
         run: dotnet test tests/OptiCopy.Tests/OptiCopy.Tests.csproj --configuration Release
       - name: TypeScript decodes C# DCF2, frames and fountain stream
+        working-directory: ref/decimen-optical-transfer
         env:
           DECIMEN_REF_ROOT: ${{ github.workspace }}/ref/decimen-optical-transfer
           DECIMEN_FIXTURE_ROOT: ${{ github.workspace }}/artifacts/interop
           DECIMEN_MODE: verify
-        run: node --import tsx tests/cross-platform/run-ts-interop.mjs
+        run: node --import tsx ../../tests/cross-platform/run-ts-interop.mjs
