@@ -23,15 +23,15 @@ public static class OpticalFileContainer
     public readonly record struct PackedFile(byte[] Container, CompressionMode Compression, int OriginalSize, int TransmittedSize);
     public readonly record struct UnpackedFile(string Name, string Type, byte[] Bytes, byte[] Sha256, CompressionMode Compression, int TransmittedSize);
 
-    public static async Task<PackedFile> PackAsync(string fileName, string mimeType, ReadOnlyMemory<byte> bytes, CancellationToken cancellationToken = default)
+    public static async Task<PackedFile> PackAsync(string fileName, string? mimeType, ReadOnlyMemory<byte> bytes, CancellationToken cancellationToken = default)
     {
-        ArgumentException.ThrowIfNullOrWhiteSpace(fileName);
-        ArgumentException.ThrowIfNullOrWhiteSpace(mimeType);
+        ArgumentNullException.ThrowIfNull(fileName);
         if (bytes.IsEmpty) throw new ArgumentException("The file is empty.", nameof(bytes));
         if (bytes.Length > MaxFileBytes) throw new NotSupportedException("The current Decimen format supports files up to 64 MiB.");
 
         var nameBytes = Encoding.UTF8.GetBytes(SanitizeFileName(fileName));
-        var typeBytes = Encoding.UTF8.GetBytes(mimeType);
+        mimeType ??= string.Empty;
+        var typeBytes = Encoding.UTF8.GetBytes(mimeType.Length == 0 ? "application/octet-stream" : mimeType);
         if (nameBytes.Length > ushort.MaxValue) throw new ArgumentException("The file name is too long.", nameof(fileName));
         if (typeBytes.Length > ushort.MaxValue) throw new ArgumentException("The MIME type is too long.", nameof(mimeType));
 
@@ -138,7 +138,10 @@ public static class OpticalFileContainer
 
     private static string SanitizeFileName(string name)
     {
-        var baseName = name.Split(['\\', '/'], StringSplitOptions.RemoveEmptyEntries).LastOrDefault() ?? string.Empty;
+        // Match the TypeScript contract exactly: split, then take the final
+        // component even when the input ends in a path separator.
+        var parts = name.Split(['\\', '/']);
+        var baseName = parts.Length == 0 ? string.Empty : parts[^1];
         var cleaned = new string(baseName.Where(c => !char.IsControl(c) && c != '\u007f').ToArray()).Trim();
         return cleaned is "" or "." or ".." ? "transfer.bin" : cleaned;
     }
