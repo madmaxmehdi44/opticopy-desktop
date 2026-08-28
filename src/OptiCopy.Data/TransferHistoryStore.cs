@@ -34,7 +34,7 @@ public sealed record TransferHistoryEntry(
     int BlockLength,
     string? Error);
 
-public sealed class TransferHistoryStore
+public sealed class TransferHistoryStore : IDisposable
 {
     private const int MaxEntries = 500;
     private static readonly JsonSerializerOptions JsonOptions = new()
@@ -46,6 +46,7 @@ public sealed class TransferHistoryStore
 
     private readonly string _path;
     private readonly SemaphoreSlim _gate = new(1, 1);
+    private bool _disposed;
 
     public TransferHistoryStore(string? path = null)
     {
@@ -57,6 +58,7 @@ public sealed class TransferHistoryStore
 
     public async Task<IReadOnlyList<TransferHistoryEntry>> GetAsync(CancellationToken cancellationToken = default)
     {
+        ObjectDisposedException.ThrowIf(_disposed, this);
         await _gate.WaitAsync(cancellationToken).ConfigureAwait(false);
         try
         {
@@ -70,6 +72,7 @@ public sealed class TransferHistoryStore
 
     public async Task AddAsync(TransferHistoryEntry entry, CancellationToken cancellationToken = default)
     {
+        ObjectDisposedException.ThrowIf(_disposed, this);
         await _gate.WaitAsync(cancellationToken).ConfigureAwait(false);
         try
         {
@@ -89,6 +92,7 @@ public sealed class TransferHistoryStore
     public async Task UpdateAsync(Guid id, Func<TransferHistoryEntry, TransferHistoryEntry> update, CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(update);
+        ObjectDisposedException.ThrowIf(_disposed, this);
         await _gate.WaitAsync(cancellationToken).ConfigureAwait(false);
         try
         {
@@ -108,6 +112,7 @@ public sealed class TransferHistoryStore
 
     public async Task ClearAsync(CancellationToken cancellationToken = default)
     {
+        ObjectDisposedException.ThrowIf(_disposed, this);
         await _gate.WaitAsync(cancellationToken).ConfigureAwait(false);
         try
         {
@@ -178,5 +183,13 @@ public sealed class TransferHistoryStore
                 // Cleanup failure is non-fatal after the atomic move attempt.
             }
         }
+    }
+
+    public void Dispose()
+    {
+        if (_disposed)
+            return;
+        _disposed = true;
+        _gate.Dispose();
     }
 }
