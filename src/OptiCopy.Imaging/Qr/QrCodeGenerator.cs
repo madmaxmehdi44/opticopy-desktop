@@ -59,9 +59,6 @@ public sealed class QrCodeGenerator
             CharacterSet: "ISO-8859-1",
             DisableEci: true);
 
-        // Decimen frames are arbitrary binary bytes. Use QR byte mode with
-        // ISO-8859-1's one-to-one byte mapping and suppress ECI so the wire
-        // payload is not reinterpreted as UTF-8 text by another implementation.
         options = options with
         {
             CharacterSet = "ISO-8859-1",
@@ -69,6 +66,41 @@ public sealed class QrCodeGenerator
         };
 
         return Generate(Encoding.Latin1.GetString(content), options);
+    }
+
+    /// <summary>
+    /// Generates the QR symbol at its native module resolution.
+    /// The caller can then enlarge the resulting raster by an integer factor
+    /// without introducing interpolated module edges. This matches the
+    /// Decimen sender's one-module-per-pixel rasterization before scaling.
+    /// </summary>
+    public QrMatrix GenerateNativeBinary(ReadOnlySpan<byte> content, QrCodeOptions? options = null)
+    {
+        if (content.IsEmpty)
+            throw new ArgumentException("QR payload cannot be empty.", nameof(content));
+
+        options ??= new QrCodeOptions(
+            ErrorCorrection: QrErrorCorrection.Low,
+            CharacterSet: "ISO-8859-1",
+            DisableEci: true);
+
+        options = options with
+        {
+            Width = 0,
+            Height = 0,
+            CharacterSet = "ISO-8859-1",
+            DisableEci = true
+        };
+
+        var hints = CreateHints(options);
+        var matrix = _writer.encode(
+            Encoding.Latin1.GetString(content),
+            BarcodeFormat.QR_CODE,
+            0,
+            0,
+            hints);
+
+        return ToMatrix(matrix);
     }
 
     private static Dictionary<EncodeHintType, object> CreateHints(QrCodeOptions options)
@@ -92,8 +124,8 @@ public sealed class QrCodeGenerator
 
     private static void ValidateOptions(QrCodeOptions options)
     {
-        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(options.Width);
-        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(options.Height);
+        ArgumentOutOfRangeException.ThrowIfNegative(options.Width);
+        ArgumentOutOfRangeException.ThrowIfNegative(options.Height);
         ArgumentOutOfRangeException.ThrowIfNegative(options.QuietZone);
         ArgumentOutOfRangeException.ThrowIfLessThan(options.QrMaskPattern, 0);
         ArgumentOutOfRangeException.ThrowIfGreaterThan(options.QrMaskPattern, 7);
