@@ -5,6 +5,7 @@ using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Media.Imaging;
 using OptiCopy.Core.Transfer;
 using OptiCopy.Imaging.Qr;
+using OptiCopy.Windows.Diagnostics;
 using global::System.Runtime.InteropServices.WindowsRuntime;
 using global::Windows.Storage.Pickers;
 using WinRT.Interop;
@@ -25,12 +26,14 @@ public sealed partial class SenderPage : Page
         _timer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(125) };
         _timer.Tick += Timer_Tick;
         StartButton.IsEnabled = false;
+        AppLogger.Info("SenderPage initialized.");
     }
 
     private async void ChooseFile_Click(object sender, RoutedEventArgs e)
     {
         try
         {
+            AppLogger.Info("ChooseFile_Click started.");
             if (App.MainWindow is null)
                 throw new InvalidOperationException("The OptiCopy window is not initialized.");
 
@@ -46,22 +49,30 @@ public sealed partial class SenderPage : Page
             picker.FileTypeFilter.Add("*");
 
             var hwnd = WindowNative.GetWindowHandle(App.MainWindow);
+            AppLogger.Info($"Initializing FileOpenPicker. HWND=0x{hwnd.ToInt64():X}.");
             InitializeWithWindow.Initialize(picker, hwnd);
+            AppLogger.Info("FileOpenPicker initialized.");
 
             var file = await picker.PickSingleFileAsync();
             if (file is null)
             {
+                AppLogger.Info("File picker returned no file.");
                 EngineStatus.Text = "READY";
                 StatusLabel.Text = "NO FILE SELECTED";
                 return;
             }
 
+            var properties = await file.GetBasicPropertiesAsync();
+            AppLogger.Info($"File selected. Name='{file.Name}', Path='{file.Path}', ContentType='{file.ContentType}', Size='{properties.Size}'.");
             var payload = await File.ReadAllBytesAsync(file.Path);
+            AppLogger.Info($"File read succeeded. Bytes={payload.LongLength}.");
+
             _session = await OpticalTransferSession.CreateAsync(
                 payload,
                 file.Name,
                 "application/octet-stream",
                 CreateSessionId());
+            AppLogger.Info($"Transfer session created. SourceBlocks={_session.Metadata.SourceBlocks}, BlockLength={_session.Metadata.BlockLength}, MinimumFrames={_session.MinimumFrames}.");
             _framesTarget = Math.Max(_session.MinimumFrames, 1u);
 
             FileNameLabel.Text = file.Name;
@@ -78,12 +89,15 @@ public sealed partial class SenderPage : Page
             ProgressLabel.Text = "0%";
             SpeedLabel.Text = "— fps";
             StartButton.IsEnabled = true;
+            AppLogger.Info("ChooseFile_Click completed successfully.");
         }
         catch (Exception ex)
         {
+            AppLogger.Error("ChooseFile_Click failed.", ex);
             EngineStatus.Text = "ERROR";
-            StatusLabel.Text = $"FILE ERROR: {ex.Message}";
+            StatusLabel.Text = $"FILE ERROR: {ex.GetType().Name}: {ex.Message}";
             StartButton.IsEnabled = _session is not null;
+            await ShowFileErrorAsync(ex);
         }
         finally
         {
@@ -91,9 +105,27 @@ public sealed partial class SenderPage : Page
         }
     }
 
+    private static async Task ShowFileErrorAsync(Exception ex)
+    {
+        var root = App.MainWindow?.Content.XamlRoot;
+        if (root is null)
+            return;
+
+        var dialog = new ContentDialog
+        {
+            Title = "File opening error",
+            Content = $"{ex.GetType().Name}: {ex.Message}\n\nFull details:\n{AppLogger.LogFilePath}",
+            CloseButtonText = "OK",
+            XamlRoot = root
+        };
+
+        await dialog.ShowAsync();
+    }
+
     private void Start_Click(object sender, RoutedEventArgs e)
     {
         if (_session is null) return;
+        AppLogger.Info("Transmission start requested.");
         _session.Reset();
         _clock.Restart();
         _renderInProgress = false;
@@ -110,6 +142,7 @@ public sealed partial class SenderPage : Page
     {
         if (_timer.IsEnabled)
         {
+            AppLogger.Info("Transmission paused.");
             _timer.Stop();
             _clock.Stop();
             PauseButton.Content = "Resume";
@@ -118,6 +151,7 @@ public sealed partial class SenderPage : Page
         }
         else
         {
+            AppLogger.Info("Transmission resumed.");
             _clock.Start();
             _timer.Start();
             PauseButton.Content = "Pause";
@@ -128,6 +162,7 @@ public sealed partial class SenderPage : Page
 
     private void Stop_Click(object sender, RoutedEventArgs e)
     {
+        AppLogger.Info("Transmission stop requested.");
         _timer.Stop();
         _clock.Stop();
         _session?.Reset();
@@ -205,13 +240,14 @@ public sealed partial class SenderPage : Page
         }
         catch (Exception ex)
         {
+            AppLogger.Error("RenderFrame failed.", ex);
             _timer.Stop();
             _clock.Stop();
             PauseButton.IsEnabled = false;
             StopButton.IsEnabled = false;
             StartButton.IsEnabled = _session is not null;
             EngineStatus.Text = "ERROR";
-            StatusLabel.Text = $"RENDER ERROR: {ex.Message}";
+            StatusLabel.Text = $"RENDER ERROR: {ex.GetType().Name}: {ex.Message}";
         }
         finally
         {
