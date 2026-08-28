@@ -7,13 +7,15 @@ namespace OptiCopy.Windows;
 
 public sealed partial class MainWindow : Window
 {
+    private bool _settingsLoaded;
+
     public MainWindow()
     {
         InitializeComponent();
-        Loaded += MainWindow_Loaded;
+        Activated += MainWindow_Activated;
 
         var handle = WindowNative.GetWindowHandle(this);
-        var windowId = Microsoft.UI.Win32Interop.GetWindowIdFromWindow(handle);
+        var windowId = Microsoft.Win32Interop.GetWindowIdFromWindow(handle);
         var appWindow = AppWindow.GetFromWindowId(windowId);
         if (appWindow is not null)
             appWindow.Resize(new global::Windows.Graphics.SizeInt32(1280, 820));
@@ -21,8 +23,12 @@ public sealed partial class MainWindow : Window
         ContentFrame.Navigate(typeof(SenderPage));
     }
 
-    private async void MainWindow_Loaded(object sender, RoutedEventArgs e)
+    private async void MainWindow_Activated(object sender, WindowActivatedEventArgs args)
     {
+        if (_settingsLoaded)
+            return;
+
+        _settingsLoaded = true;
         try
         {
             var settings = await App.Settings.LoadAsync();
