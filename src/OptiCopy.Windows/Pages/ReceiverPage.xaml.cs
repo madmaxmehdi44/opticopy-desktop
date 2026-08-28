@@ -12,9 +12,10 @@ using WinRT.Interop;
 
 namespace OptiCopy.Windows.Pages;
 
-public sealed partial class ReceiverPage : Page
+public sealed partial class ReceiverPage : Page, IAsyncDisposable
 {
     private sealed record CameraOption(string Id, string Name);
+    private static readonly string[] BinaryFallbackExtensions = [".bin"];
 
     private readonly WindowsCameraSource _camera = new();
     private readonly QrCodeDecoder _qrDecoder = new();
@@ -22,6 +23,7 @@ public sealed partial class ReceiverPage : Page
     private readonly Stopwatch _clock = new();
     private int _frameBusy;
     private bool _cameraRunning;
+    private bool _disposed;
 
     public ReceiverPage()
     {
@@ -36,7 +38,7 @@ public sealed partial class ReceiverPage : Page
         try
         {
             CameraStatus.Text = "Enumerating cameras…";
-            var cameras = await _camera.GetCamerasAsync();
+            var cameras = await WindowsCameraSource.GetCamerasAsync();
             CameraSelector.ItemsSource = cameras.Select(static c => new CameraOption(c.Id, c.Name)).ToArray();
             CameraSelector.DisplayMemberPath = nameof(CameraOption.Name);
             CameraSelector.SelectedValuePath = nameof(CameraOption.Id);
@@ -60,9 +62,9 @@ public sealed partial class ReceiverPage : Page
         }
     }
 
-    private async void CameraSelector_SelectionChanged(object sender, SelectionChangedEventArgs e)
+    private void CameraSelector_SelectionChanged(object sender, SelectionChangedEventArgs e)
     {
-        if (_cameraRunning || CameraSelector.SelectedValue is not string cameraId)
+        if (_cameraRunning || CameraSelector.SelectedValue is not string)
             return;
 
         CameraStatus.Text = "Camera selected. Press Start camera.";
@@ -110,9 +112,7 @@ public sealed partial class ReceiverPage : Page
 
     private async void ReceiverPage_Unloaded(object sender, RoutedEventArgs e)
     {
-        await StopCameraAsync();
-        _camera.FrameArrived -= Camera_FrameArrived;
-        await _camera.DisposeAsync();
+        await DisposeAsync();
     }
 
     private void Camera_FrameArrived(object? sender, CameraFrame frame)
@@ -203,9 +203,9 @@ public sealed partial class ReceiverPage : Page
 
             var extension = System.IO.Path.GetExtension(received.FileName);
             if (!string.IsNullOrWhiteSpace(extension))
-                picker.FileTypeChoices.Add(received.MimeType, new[] { extension });
+                picker.FileTypeChoices.Add(received.MimeType, [extension]);
             else
-                picker.FileTypeChoices.Add(received.MimeType, new[] { ".bin" });
+                picker.FileTypeChoices.Add(received.MimeType, BinaryFallbackExtensions);
 
             var file = await picker.PickSaveFileAsync();
             if (file is null)
@@ -246,6 +246,17 @@ public sealed partial class ReceiverPage : Page
             if (_receiver.CompletedFile is null)
                 StatusLabel.Text = "READY";
         }
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        if (_disposed)
+            return;
+        _disposed = true;
+        await StopCameraAsync();
+        _camera.FrameArrived -= Camera_FrameArrived;
+        await _camera.DisposeAsync();
+        _clock.Stop();
     }
 
     private static WriteableBitmap CreateBitmap(byte[] pixels, int width, int height)
